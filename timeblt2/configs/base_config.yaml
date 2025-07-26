@@ -1,0 +1,82 @@
+# Base configuration for ByteLatent training
+
+training:
+  batch_size: 128
+  learning_rate: 5e-4
+  weight_decay: 1e-2
+  epochs: 10
+  grad_accumulation_steps: 1
+  clip_grad: 1.0
+  seed: 42
+  warmup_steps: 0
+  min_lr_factor: 0.1
+  decay_lr: true
+  compile_model: false
+  dtype: "auto"
+  output_dir: "output"
+  save_every: 1
+  log_every: 50
+  eval_every: 1
+  use_tensorboard: true
+  cuda_device: "0"
+
+model:
+  vocab_size: 4096
+  seq_len: 512
+  dim: 128
+  n_layers_global: 4
+  n_layers_local: 4
+  n_layers_local_decoder: 2
+  n_layers_local_encoder: 2
+  dim_local_encoder: 64
+  dim_local_decoder: 64
+  cross_attn_k: 2
+  cross_attn_nheads: 4
+  patch_size: 8
+  patching_mode: "static"
+  patching_threshold: 3.1439168453216553
+  tie_local_encoder_decoder_logits: false
+  patch_in_forward: false
+  pad_to_max_length: true
+  encoder_hash_byte_group_size: [4, 5, 6]
+  encoder_hash_byte_group_vocab: 128
+  encoder_hash_byte_group_nb_functions: 1
+  encoder_enable_byte_ngrams: false
+  cross_attn_encoder: true
+  cross_attn_decoder: true
+  cross_attn_all_layers_decoder: true
+  cross_attn_all_layers_encoder: true
+  cross_attn_use_flex_attention: false
+  cross_attn_init_by_pooling: true
+  log_patch_lengths: true
+  non_linearity: "swiglu"
+  use_rope: true
+  recompute_fc1_out: false
+  recompute_fc3_out: false
+  recompute_attn: false
+  custom_bwd: false
+  layer_ckpt: "none"
+  use_local_encoder_transformer: true
+  init_use_gaussian: true
+  init_use_depth: "current"
+  attn_impl: "sdpa"
+  attn_bias_type: "causal"
+  alpha_depth: "disabled"
+  downsampling_by_pooling: "max"
+
+data:
+  dataset: "ETTm1"
+  data_path: "ETTm1.csv"
+  root_path: "dataset/ETT-small/"
+  features: "S"
+  target: "OT"
+  freq: "m"
+  num_workers: 2
+  shuffle: true
+  scale: true
+  tokenizer_low_limit: -15.0
+  tokenizer_high_limit: 15.0
+  n_special_tokens: 4
+  pad_token_id: -1
+  eos_token_id: 0
+  use_eos_token: false

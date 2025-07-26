@@ -1,0 +1,438 @@
+import os
+import time
+from contextlib import nullcontext
+from pathlib import Path
+
+import numpy as np
+import torch
+from torch.nn.parallel import DistributedDataParallel as DDP
+from tqdm import tqdm
+
+from model import GPTConfig, GPT
+from utils.train_utils import build_dataloader, build_tokenizer, get_lr
+
+
+# ============================================================================
+# CONFIGURATION SECTION
+# ============================================================================
+
+class TrainingConfig:
+    """Training configuration parameters"""
+    
+    # Hardware Configuration
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # Set before torch import
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
+    dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16'
+    
+    # Model Architecture
+    n_layer = 2
+    n_head = 4
+    n_embd = 32
+    dropout = 0.1
+    bias = False
+    vocab_size = 512
+    
+    # Data Configuration
+    dataset_name = 'ETTm1'
+    features = 'M'
+    quant_range = 3
+    batch_size = 256
+    seq_len = 96
+    block_size = seq_len
+    
+    # Training Hyperparameters
+    learning_rate = 5e-4
+    weight_decay = 1e-1
+    beta1 = 0.9
+    beta2 = 0.95
+    epochs = 500
+    grad_accumulation_steps = 1
+    clip_grad = 1.0
+    
+    # Learning Rate Schedule
+    warmup_steps = 0
+    min_lr_factor = 0.1
+    decay_lr = True
+    
+    # Training Control
+    patience = 10  # Early stopping patience
+    save_every = 10
+    seed = 42
+    compile = False
+    
+    # Output
+    output_dir = "output"
+
+
+# ============================================================================
+# EARLY STOPPING CLASS
+# ============================================================================
+
+class EarlyStopping:
+    """Early stops the training if validation loss doesn't improve after a given patience."""
+    
+    def __init__(self, patience=12, verbose=False, delta=0, save_path='best_model.pt'):
+        """
+        Args:
+            patience (int): How long to wait after last time validation loss improved.
+            verbose (bool): If True, prints a message for each validation loss improvement. 
+            delta (float): Minimum change in the monitored quantity to qualify as an improvement.
+            save_path (str): Path for the checkpoint to be saved to.
+        """
+        self.patience = patience
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = float('inf')
+        self.delta = delta
+        self.save_path = save_path
+
+    def __call__(self, val_loss, model, epoch):
+        score = -val_loss
+
+        if self.best_score is None:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model, epoch)
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            if self.verbose:
+                print(f'⏳ EarlyStopping counter: {self.counter} out of {self.patience}')
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model, epoch)
+            self.counter = 0
+
+    def save_checkpoint(self, val_loss, model, epoch):
+        """Saves model when validation loss decrease."""
+        if self.verbose:
+            print(f'💾 Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model...')
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'val_loss': val_loss,
+        }, self.save_path)
+        self.val_loss_min = val_loss
+
+
+# ============================================================================
+# EVALUATION FUNCTION
+# ============================================================================
+
+@torch.no_grad()
+def evaluate(model, val_loader, tokenizer, device):
+    """Evaluate model on validation set"""
+    model.eval()
+    total_val_loss = 0
+    num_batches = len(val_loader)
+    
+    for batch_x, batch_y, _, _ in val_loader:
+        x = batch_x.float().squeeze(-1).to(device)
+        y = batch_y.float().squeeze(-1).to(device)
+        
+        # Tokenize inputs
+        token_ids, attention_mask, tokenizer_state = tokenizer.context_input_transform(x.cpu())
+        target_token_ids, target_attention_mask = tokenizer.label_input_transform(y.cpu(), tokenizer_state)
+        
+        # Move to device
+        token_ids = token_ids.to(device)
+        target_token_ids = target_token_ids.to(device)
+        
+        # Forward pass (no grad)
+        logits, loss = model(token_ids, target_token_ids)
+        total_val_loss += loss.item()
+    
+    avg_val_loss = total_val_loss / num_batches
+    return avg_val_loss
+
+
+# ============================================================================
+# TRAINING SETUP FUNCTIONS
+# ============================================================================
+
+def setup_environment(config):
+    """Setup training environment"""
+    torch.cuda.set_device(0)  # 0 here means "the first visible GPU"
+    torch.set_float32_matmul_precision('high')
+    
+    # Create output directory
+    Path(config.output_dir).mkdir(parents=True, exist_ok=True)
+    
+    print(f"Using device: {config.device}")
+    print(f"Using precision: {config.dtype}")
+
+
+def setup_data_loaders(config):
+    """Setup training and validation data loaders"""
+    train_dataset, train_loader = build_dataloader(
+        dataset_name=config.dataset_name,
+        features=config.features, 
+        seq_len=config.seq_len, 
+        label_len=config.seq_len - 1, 
+        pred_len=1, 
+        flag='train', 
+        batch_size=config.batch_size,
+        pretrain=True
+    )
+
+    validate_dataset, validate_loader = build_dataloader(
+        dataset_name=config.dataset_name,
+        features=config.features, 
+        seq_len=config.seq_len, 
+        label_len=config.seq_len - 1, 
+        pred_len=1, 
+        flag='val', 
+        batch_size=config.batch_size,
+        pretrain=True
+    )
+    
+    print(f"Dataset: {config.dataset_name}, Features: {config.features}, "
+          f"Batch Size: {config.batch_size}, Seq Len: {config.seq_len}")
+    
+    return train_loader, validate_loader
+
+
+def setup_model(config):
+    """Setup model, optimizer, and tokenizer"""
+    # Model initialization
+    model_args = dict(
+        n_layer=config.n_layer, 
+        n_head=config.n_head, 
+        n_embd=config.n_embd, 
+        block_size=config.block_size,
+        bias=config.bias, 
+        vocab_size=config.vocab_size, 
+        dropout=config.dropout
+    )
+    gptconf = GPTConfig(**model_args)
+    model = GPT(gptconf)
+    model.to(config.device)
+    
+    # Optimizer
+    optimizer = model.configure_optimizers(
+        config.weight_decay, 
+        config.learning_rate, 
+        (config.beta1, config.beta2), 
+        config.device_type
+    )
+    
+    # Tokenizer
+    tokenizer = build_tokenizer(
+        quant_range=config.quant_range,
+        vocab_size=config.vocab_size,
+        context_length=config.seq_len,
+        prediction_length=config.seq_len
+    )
+    
+    # Gradient scaler
+    scaler = torch.cuda.amp.GradScaler(enabled=(config.dtype == 'float16'))
+    
+    # Compile model if requested
+    if config.compile:
+        model = torch.compile(model)
+    
+    return model, optimizer, tokenizer, scaler
+
+
+# ============================================================================
+# TRAINING LOOP
+# ============================================================================
+
+def train_epoch(model, train_loader, optimizer, tokenizer, scaler, config, epoch, 
+                num_batches, total_steps, early_stopping):
+    """Train for one epoch"""
+    model.train()
+    epoch_loss = 0
+    current_lr = 0
+    t1 = time.time()
+    
+    progress_bar = tqdm(
+        enumerate(train_loader), 
+        total=len(train_loader), 
+        desc=f"🏃 Epoch {epoch+1}/{config.epochs}", 
+        position=0, 
+        leave=True
+    )
+    
+    for i, (batch_x, batch_y, _, _) in progress_bar:
+        iteration = epoch * num_batches + i
+        x = batch_x.float().squeeze(-1)
+        y = batch_y.float().squeeze(-1)
+        
+        # Get learning rate
+        min_lr = config.learning_rate * config.min_lr_factor
+        lr = get_lr(iteration, total_steps, config.warmup_steps, 
+                   config.learning_rate, min_lr, config.decay_lr)
+        current_lr = lr
+        
+        # Update learning rate
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+            
+        total_loss = 0
+        optimizer.zero_grad(set_to_none=True)
+        
+        # Gradient accumulation loop
+        for micro_step in range(config.grad_accumulation_steps):
+            token_ids, attention_mask, tokenizer_state = tokenizer.context_input_transform(x)
+            target_token_ids, target_attention_mask = tokenizer.label_input_transform(y, tokenizer_state)
+            
+            # Forward pass
+            logits, loss = model(token_ids.to(config.device), target_token_ids.to(config.device))
+            
+            # Calculate loss
+            loss = loss / config.grad_accumulation_steps
+            
+            # Backward pass
+            scaler.scale(loss).backward()
+            total_loss += loss.item() * config.grad_accumulation_steps
+        
+        # Gradient clipping
+        if config.clip_grad > 0:
+            scaler.unscale_(optimizer)
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip_grad)
+        
+        # Update weights
+        scaler.step(optimizer)
+        scaler.update()
+        
+        # Update metrics
+        epoch_loss += total_loss
+        avg_epoch_loss = epoch_loss / (i + 1)
+        
+        # Update progress bar
+        progress_bar.set_postfix({
+            'loss': f"{total_loss:.4f}",
+            'avg_loss': f"{avg_epoch_loss:.4f}",
+            'lr': f"{lr:.6f}",
+            'patience': f"{early_stopping.counter}/{early_stopping.patience}"
+        })
+    
+    train_time = time.time() - t1
+    train_avg_loss = epoch_loss / len(train_loader)
+    
+    return train_avg_loss, train_time, current_lr
+
+
+def main():
+    """Main training function"""
+    # ========================================================================
+    # INITIALIZATION
+    # ========================================================================
+    
+    config = TrainingConfig()
+    setup_environment(config)
+    
+    # Setup data loaders
+    train_loader, validate_loader = setup_data_loaders(config)
+    
+    # Setup model, optimizer, tokenizer
+    model, optimizer, tokenizer, scaler = setup_model(config)
+    
+    # Training setup
+    num_batches = len(train_loader)
+    total_steps = config.epochs * num_batches
+    best_val_loss = float('inf')
+    
+    # Initialize early stopping
+    early_stopping = EarlyStopping(
+        patience=config.patience, 
+        verbose=True, 
+        save_path=f'{config.output_dir}/best_model_checkpoint.pt'
+    )
+    
+    # Training statistics tracking
+    training_stats = {
+        'train_losses': [],
+        'val_losses': [],
+        'learning_rates': [],
+        'epochs_completed': 0,
+        'best_epoch': 0,
+        'total_training_time': 0
+    }
+    
+    print(f"🚀 Starting training for {config.epochs} epochs with early stopping (patience={early_stopping.patience})")
+    print(f"📊 Total steps: {total_steps}, Batches per epoch: {num_batches}")
+    
+    # ========================================================================
+    # TRAINING LOOP
+    # ========================================================================
+    
+    training_start_time = time.time()
+    
+    for epoch in range(config.epochs):
+        # Training phase
+        train_avg_loss, train_time, current_lr = train_epoch(
+            model, train_loader, optimizer, tokenizer, scaler, config, 
+            epoch, num_batches, total_steps, early_stopping
+        )
+        
+        # Validation phase
+        t2 = time.time()
+        val_avg_loss = evaluate(model, validate_loader, tokenizer, config.device)
+        val_time = time.time() - t2
+        
+        # Update training statistics
+        training_stats['train_losses'].append(train_avg_loss)
+        training_stats['val_losses'].append(val_avg_loss)
+        training_stats['learning_rates'].append(current_lr)
+        training_stats['epochs_completed'] = epoch + 1
+        
+        # Check if this is the best validation loss
+        if val_avg_loss < best_val_loss:
+            best_val_loss = val_avg_loss
+            training_stats['best_epoch'] = epoch + 1
+        
+        print(f"✅ Epoch {epoch+1}/{config.epochs} | Train Loss: {train_avg_loss:.4f} | Val Loss: {val_avg_loss:.4f} | "
+              f"Best Val: {best_val_loss:.4f} | Time: {train_time:.2f}s (Train) / {val_time:.2f}s (Val) | "
+              f"LR: {current_lr:.6f}")
+        
+        # Early stopping check
+        early_stopping(val_avg_loss, model, epoch + 1)
+        
+        if early_stopping.early_stop:
+            print(f"\n🛑 Early stopping triggered after {epoch + 1} epochs!")
+            print(f"📈 Best validation loss: {early_stopping.val_loss_min:.6f}")
+            print(f"⏱️  No improvement for {early_stopping.patience} consecutive epochs")
+            break
+    
+    # ========================================================================
+    # TRAINING COMPLETION
+    # ========================================================================
+    
+    # Calculate total training time
+    total_training_time = time.time() - training_start_time
+    training_stats['total_training_time'] = total_training_time
+    
+    # Training completed
+    print(f"\n🎉 Training completed!")
+    print(f"📊 Training Summary:")
+    print(f"   • Total epochs: {training_stats['epochs_completed']}")
+    print(f"   • Best epoch: {training_stats['best_epoch']}")
+    print(f"   • Best validation loss: {best_val_loss:.6f}")
+    print(f"   • Total training time: {total_training_time:.2f}s ({total_training_time/60:.2f}m)")
+    print(f"   • Average time per epoch: {total_training_time/training_stats['epochs_completed']:.2f}s")
+    
+    # Load best model for final evaluation
+    if early_stopping.save_path:
+        print(f"🔄 Loading best model from {early_stopping.save_path}")
+        checkpoint = torch.load(early_stopping.save_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"✅ Best model loaded (epoch {checkpoint['epoch']}, val_loss: {checkpoint['val_loss']:.6f})")
+    
+    # Save training statistics
+    torch.save(training_stats, f'{config.output_dir}/training_statistics.pt')
+    print(f"📁 Training statistics saved to {config.output_dir}/training_statistics.pt")
+    
+    return model, training_stats
+
+
+# ============================================================================
+# ENTRY POINT
+# ============================================================================
+
+if __name__ == "__main__":
+    model, stats = main()
