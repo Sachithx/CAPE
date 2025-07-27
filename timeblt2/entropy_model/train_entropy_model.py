@@ -27,17 +27,17 @@ class TrainingConfig:
     dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16'
     
     # Model Architecture
-    n_layer = 2
+    n_layer = 3
     n_head = 4
-    n_embd = 128
-    dropout = 0.2
+    n_embd = 64
+    dropout = 0.1
     bias = False
-    vocab_size = 256
+    vocab_size = 512
     
     # Data Configuration
     dataset_name = 'ETTm1'
     features = 'M'
-    quant_range = 4
+    quant_range = 5
     batch_size = 128
     seq_len = 96
     block_size = seq_len
