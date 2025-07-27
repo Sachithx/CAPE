@@ -4,10 +4,9 @@ from bytelatent.model.blt import ByteLatentTransformerArgs, ByteLatentTransforme
 from utils.patch_utils import build_tokenizer
 
 
-
 ## Training Args
 vocab_size = 512
-quant_range = 3
+quant_range = 4
 seq_len = 336
 
 # Initialize components
