@@ -1,3 +1,4 @@
 # CAPE-TST
 This repository includes the code for the paper "Context-Aware Dynamic Patch Encoder for Time Series Transformers".
-![Uploading image.png…]()
+<img width="2508" height="4779" alt="image" src="https://github.com/user-attachments/assets/998c0d5f-8ebf-410e-95f5-7a32c7b11465" />
+
