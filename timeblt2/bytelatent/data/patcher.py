@@ -561,12 +561,12 @@ class Patcher:
         self.patcher_args = patcher_args
         self.patching_mode = patcher_args.patching_mode
         self.realtime_patching = patcher_args.realtime_patching
-        # if self.realtime_patching:
-            # assert (
-            #     patcher_args.entropy_model_checkpoint_dir is not None
-            # ), "Cannot require realtime patching without an entropy model checkpoint"
+        if self.realtime_patching:
+            assert (
+                patcher_args.entropy_model_checkpoint_dir is not None
+            ), "Cannot require realtime patching without an entropy model checkpoint"
         entropy_model = load_entropy_model(
-            "amazon/chronos-t5-tiny"
+            patcher_args.entropy_model_checkpoint_dir
         )
         entropy_model, _ = to_device(entropy_model, patcher_args.patching_device)
         self.entropy_model = entropy_model

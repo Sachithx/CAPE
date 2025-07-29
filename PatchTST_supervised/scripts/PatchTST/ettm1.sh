@@ -5,7 +5,7 @@ fi
 if [ ! -d "./logs/LongForecasting" ]; then
     mkdir ./logs/LongForecasting
 fi
-seq_len=96
+seq_len=336
 model_name=PatchTST
 
 root_path_name=./dataset/
@@ -32,9 +32,9 @@ do
       --n_heads 8 \
       --d_model 32 \
       --d_ff 256 \
-      --dropout 0.2\
-      --fc_dropout 0.2\
-      --head_dropout 0.2\
+      --dropout 0.1\
+      --fc_dropout 0.1\
+      --head_dropout 0.1\
       --patch_len 4\
       --stride 8\
       --des 'Exp' \

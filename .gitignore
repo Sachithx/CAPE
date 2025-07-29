@@ -208,3 +208,7 @@ __marimo__/
 .DS_Store
 timeblt2/entropy_model/output/
 timeblt2/entropy_model/wandb/
+
+timeblt2/wandb/
+PatchTST_supervised/wandb/
+PatchTST_supervised/checkpoints/

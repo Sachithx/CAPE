@@ -1,5 +1,6 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 import math
+import os
 import time
 from collections import defaultdict
 from contextlib import nullcontext
@@ -30,12 +31,12 @@ class PatcherArgs(BaseModel):
     patching_mode: PatchingModeEnum = PatchingModeEnum.entropy
     patching_device: str = "cuda"
     entropy_model_checkpoint_dir: str | None = None
-    realtime_patching: bool = False
+    realtime_patching: bool = True
     threshold: float = 1.335442066192627
     threshold_add: float | None = None
     max_patch_length: int | None = None
     patch_size: float = 4.5
-    patching_batch_size: int = 1
+    patching_batch_size: int = 512
     device: str = "cuda"
     monotonicity: bool = False
     log_time: bool = False
@@ -58,6 +59,7 @@ def entropy(scores):
     entropy = -p_log_p.sum(dim=-1)
     return entropy
 
+
 def calculate_entropies(
     tokens: torch.tensor,
     entropy_model,
@@ -77,124 +79,32 @@ def calculate_entropies(
     with grad_context:
         entropies = []
         preds = []
-        max_length = getattr(entropy_model, "max_length", 512)
+        max_length = getattr(entropy_model, "max_length", 96)
         batch_numel = max_length * patching_batch_size
         splits = torch.split(tokens.flatten(), batch_numel)
-        vocab_size = entropy_model.config.n_tokens
-        decoder_start_token_id = 0
-        # Save original shape
-        # original_shape = tokens.shape
-        # vocab_size = entropy_model.config.n_tokens
-
-        # Flatten the tokens for uniform processing
-        # flat_tokens = tokens.flatten()
-        # splits = torch.split(tokens.flatten(), batch_numel)
-
         for split in splits:
             pad_size = (max_length - (split.numel() % max_length)) % max_length
             pad = torch.zeros(
-                    pad_size, dtype=split.dtype, device=split.device, requires_grad=False
-                )
+                pad_size, dtype=split.dtype, device=split.device, requires_grad=False
+            )
             split = torch.cat((split, pad), dim=0)
-            split = split.reshape(-1, max_length) # shape [B, L]
+            split = split.reshape(-1, max_length)
             if device is not None:
                 split = split.to(device)
-            # if pad_size > 0:
-            #     split = torch.cat([split, torch.zeros(pad_size, dtype=split.dtype, device=split.device, requires_grad=False)])
-
-            
-            B, L = split.shape
-
-            # Allocate per-split outputs
-            # entropy_per_split = torch.zeros((B, L), device=device)
-            pred = torch.zeros((B, L, vocab_size), device=device)
-
-            for i in range(1, L):
-                context = split[:, :i]  # tokens 0 to i-1
-                attention_mask = torch.ones_like(context, dtype=torch.bool, device=device)
-
-                decoder_input_ids = torch.full(
-                    (B, 1),
-                    decoder_start_token_id,
-                    dtype=torch.long,
-                    device=device,
-                )
-
-                with torch.no_grad():
-                    outputs = entropy_model.model(
-                        input_ids=context.to(device),
-                        attention_mask=attention_mask.to(device),
-                        decoder_input_ids=decoder_input_ids,
-                        output_hidden_states=False,
-                        output_attentions=False,
-                        return_dict=True,
-                    )
-                    logits = outputs.logits[:, -1, :]  # shape: [B, vocab]
-                    pred[:, i, :] = logits
-
+            # assert torch.all(split >= 0) and torch.all(split < 260)
+            pred, _ = entropy_model(split)
             pred = pred.reshape(-1, pred.shape[-1])[
-                        : split.numel() - pad_size, :
-                    ]  # [batch_size * seq_len, vocab]
+                : split.numel() - pad_size, :
+            ]  # [batch_size * seq_len, vocab]
+            preds.append(pred)
             pred_entropies = entropy(pred)
             entropies.append(pred_entropies)
-            preds.append(pred)
+
         concat_entropies = torch.cat(entropies, dim=0)
         concat_entropies = concat_entropies.reshape(tokens.shape)
         concat_preds = torch.cat(preds, dim=0)
         concat_preds = concat_preds.reshape(tokens.shape[0], -1)
-    t2 = time.time()
-
     return concat_entropies, concat_preds
-
-
-# def calculate_entropies(
-#     tokens: torch.tensor,
-#     entropy_model,
-#     patching_batch_size,
-#     device: str | None = None,
-#     enable_grad: bool = False,
-# ):
-#     """
-#     tokens: 2D tensor of shape [batch_size, seq_len]
-#     Return 2D tensor of shape [batch_size, seq_len] with entropies for each token.
-
-#     Splits the tokens into chunks of size max_length and calculates entropies for each chunk.
-#     Entropy model can be executed on cpu or gpu, specify either 'cuda' or 'cpu' in the device argument.
-#     """
-
-#     grad_context = nullcontext() if enable_grad else torch.no_grad()
-
-#     with grad_context:
-#         entropies = []
-#         preds = []
-#         max_length = getattr(entropy_model, "max_length", 512)
-#         batch_numel = max_length * patching_batch_size
-#         splits = torch.split(tokens.flatten(), batch_numel)
-#         for split in splits:
-#             pad_size = (max_length - (split.numel() % max_length)) % max_length
-#             pad = torch.zeros(
-#                 pad_size, dtype=split.dtype, device=split.device, requires_grad=False
-#             )
-#             split = torch.cat((split, pad), dim=0)
-#             split = split.reshape(-1, max_length)
-#             if device is not None:
-#                 split = split.to(device)
-#             # assert torch.all(split >= 0) and torch.all(split < 260)
-#             pred = entropy_model(split)
-#             pred = pred.reshape(-1, pred.shape[-1])[
-#                 : split.numel() - pad_size, :
-#             ]  # [batch_size * seq_len, vocab]
-            
-#             pred_entropies = entropy(pred)
-#             entropies.append(pred_entropies)
-
-#             preds.append(pred)
-
-#         concat_entropies = torch.cat(entropies, dim=0)
-#         concat_entropies = concat_entropies.reshape(tokens.shape)
-#         concat_preds = torch.cat(preds, dim=0)
-#         concat_preds = concat_preds.reshape(tokens.shape[0], -1)
-#     return concat_entropies, concat_preds
 
 
 def patch_start_mask_from_entropy_with_monotonicity(entropies, t):
@@ -444,14 +354,14 @@ def find_entropy_patch_start_ids(
     bs, seq_len = entropies.shape[:2]
 
     first_ids = (
-        torch.tensor([0, 1], dtype=torch.long, device=entropies.device)
+        torch.tensor([0], dtype=torch.long, device=entropies.device)
         .unsqueeze(0)
         .repeat(bs, 1)
     )
     preds_truncation_len = first_ids.shape[
         1
     ]  # remove the first preds because they will be start of patches.
-    entropies = entropies[:, 1:]
+    # entropies = entropies[:, 1:]
     if threshold is None:
         num_patches = seq_len // patch_size
         patch_start_ids = entropies.topk(num_patches - 2, dim=1).indices
@@ -562,12 +472,21 @@ class Patcher:
         self.patching_mode = patcher_args.patching_mode
         self.realtime_patching = patcher_args.realtime_patching
         # if self.realtime_patching:
-            # assert (
-            #     patcher_args.entropy_model_checkpoint_dir is not None
-            # ), "Cannot require realtime patching without an entropy model checkpoint"
-        entropy_model = load_entropy_model(
-            "amazon/chronos-t5-tiny"
-        )
+        #     assert (
+        #         patcher_args.entropy_model_checkpoint_dir is not None
+        #     ), "Cannot require realtime patching without an entropy model checkpoint"
+        #     maybe_consolidated = os.path.join(
+        #         patcher_args.entropy_model_checkpoint_dir,
+        #         "consolidated/consolidated.pth",
+        #     )
+        #     if os.path.exists(maybe_consolidated):
+        #         state_path = maybe_consolidated
+        #     else:
+        #         state_path = os.path.join(
+        #             patcher_args.entropy_model_checkpoint_dir, "consolidated.pth"
+        #         )
+        entropy_model, _ = load_entropy_model()
+        print(f"Using entropy model {entropy_model} for patching")
         entropy_model, _ = to_device(entropy_model, patcher_args.patching_device)
         self.entropy_model = entropy_model
         # else:
@@ -582,6 +501,7 @@ class Patcher:
         self.log_time = patcher_args.log_time
         if self.log_time:
             self.log = defaultdict(float)
+        print(self.threshold, self.threshold_add, self.max_patch_length, self.patch_size, self.patching_batch_size, self.monotonicity)
 
     def patch(
         self,
@@ -639,7 +559,6 @@ class Patcher:
             elif preds is not None:
                 scores = entropy(preds)
             else:
-                # print(f"patch batch size: {self.patching_batch_size} Device: {self.device}")
                 start_entropies = time.time()
                 scores, _ = calculate_entropies(
                     tokens,
@@ -647,6 +566,7 @@ class Patcher:
                     self.patching_batch_size,
                     self.device,
                 )
+
             if self.log_time:
                 self.log["calculate_entropies"] += time.time() - s
                 s = time.time()

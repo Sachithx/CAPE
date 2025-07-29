@@ -54,7 +54,8 @@ class PatchTST_backbone(nn.Module):
         # -------------- model replace end --------------
 
         # Head
-        self.head_nf = d_model * 24 # number of input components for head (patches)
+        self.head_nf = d_model * 336 #* 96 # number of input components for head (patches)
+        print(f"d_model: {d_model}, head_nf: {self.head_nf}")
         self.n_vars = c_in
         self.pretrain_head = pretrain_head
         self.head_type = head_type
@@ -90,6 +91,7 @@ class PatchTST_backbone(nn.Module):
         z, _, _ = tokenizer.context_input_transform(z.cpu())
         z = z.cuda()
         z = self.backbone(z)                                                                    # z: [bs * nvars x patch_num x d_model]
+
         z = z.view(bs, nvars, z.shape[1], z.shape[2]).permute(0, 1, 3, 2)                       # z: [bs x nvars x d_model x patch_num]
         # -------------- model replace end --------------
 

@@ -81,26 +81,26 @@ HYPERPARAMETER_GRID = {
 
 # Alternative: Predefined "smart" combinations to reduce search space
 SMART_COMBINATIONS = [
-    # Small models
-    {'n_layer': 2, 'n_head': 2, 'n_embd': 32, 'quant_range': 8, 'vocab_size': 256},
-    {'n_layer': 2, 'n_head': 4, 'n_embd': 64, 'quant_range': 8, 'vocab_size': 512},
-    {'n_layer': 3, 'n_head': 4, 'n_embd': 64, 'quant_range': 12, 'vocab_size': 512},
+    # # Small models
+    # {'n_layer': 2, 'n_head': 2, 'n_embd': 32, 'quant_range': 8, 'vocab_size': 256},
+    # {'n_layer': 2, 'n_head': 4, 'n_embd': 64, 'quant_range': 8, 'vocab_size': 512},
+    # {'n_layer': 3, 'n_head': 4, 'n_embd': 64, 'quant_range': 12, 'vocab_size': 512},
     
-    # Medium models
-    {'n_layer': 3, 'n_head': 6, 'n_embd': 96, 'quant_range': 12, 'vocab_size': 1024},
-    {'n_layer': 4, 'n_head': 8, 'n_embd': 128, 'quant_range': 12, 'vocab_size': 1024},
-    {'n_layer': 4, 'n_head': 4, 'n_embd': 64, 'quant_range': 16, 'vocab_size': 1024},
+    # # Medium models
+    # {'n_layer': 3, 'n_head': 6, 'n_embd': 96, 'quant_range': 12, 'vocab_size': 1024},
+    # {'n_layer': 4, 'n_head': 8, 'n_embd': 128, 'quant_range': 12, 'vocab_size': 1024},
+    # {'n_layer': 4, 'n_head': 4, 'n_embd': 64, 'quant_range': 16, 'vocab_size': 1024},
     
-    # Large models
-    {'n_layer': 6, 'n_head': 8, 'n_embd': 128, 'quant_range': 16, 'vocab_size': 2048},
-    {'n_layer': 6, 'n_head': 6, 'n_embd': 96, 'quant_range': 16, 'vocab_size': 1024},
+    # # Large models
+    # {'n_layer': 6, 'n_head': 8, 'n_embd': 128, 'quant_range': 16, 'vocab_size': 2048},
+    # {'n_layer': 6, 'n_head': 6, 'n_embd': 96, 'quant_range': 16, 'vocab_size': 1024},
     
-    # High quantization experiments
-    {'n_layer': 3, 'n_head': 4, 'n_embd': 64, 'quant_range': 8, 'vocab_size': 2048},
-    {'n_layer': 4, 'n_head': 4, 'n_embd': 64, 'quant_range': 16, 'vocab_size': 2048},
+    # # High quantization experiments
+    # {'n_layer': 3, 'n_head': 4, 'n_embd': 64, 'quant_range': 8, 'vocab_size': 2048},
+    # {'n_layer': 4, 'n_head': 4, 'n_embd': 64, 'quant_range': 16, 'vocab_size': 2048},
     
     # Your current baseline for comparison
-    {'n_layer': 3, 'n_head': 4, 'n_embd': 64, 'quant_range': 5, 'vocab_size': 512},
+    {'n_layer': 2, 'n_head': 1, 'n_embd': 16, 'quant_range': 8, 'vocab_size': 256},
 ]
 
 

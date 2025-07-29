@@ -1,0 +1,11 @@
+{
+  "entropy_model": {
+    "n_layer": 2,
+    "n_head": 4,
+    "n_embd": 128,
+    "dropout": 0.2,
+    "bias": false,
+    "vocab_size": 256,
+    "block_size": 96
+  }
+}

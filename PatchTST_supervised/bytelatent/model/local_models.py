@@ -284,7 +284,7 @@ class LocalEncoder(LocalModelBase):
                 patch_embeds = self.apply_cross_attention(
                     h, patch_embeds, i, bs, num_patches, patch_ids, cross_mask
                 )
-
+        # print(f"cross_mask.shape: {cross_mask[0]}")
         h_residual = patch_embeds if self.cross_attn_encoder else None
         return (h, h_residual), cache
 
@@ -374,15 +374,17 @@ class LocalDecoder(LocalModelBase):
         #     )
 
         h = embeds
+        # print(f"h/emmbd shape: {embeds.shape}")
 
         if self.patch_embedding_projection is not None:
+            # print(f"Patch embeddings shape before projection: {patch_embeds.shape if patch_embeds is not None else 'None'}")
             assert patch_embeds is not None, "Patch embeddings must be passed."
             patch_embeds = self.patch_embedding_projection(patch_embeds)
             if self.cross_attn_k is not None:
                 patch_embeds = patch_embeds.reshape(
                     bs, patch_embeds.shape[1] * self.cross_attn_k, self.dim
                 )
-
+        # print(f"Patch embeddings shape after projection: {patch_embeds.shape}")
         if patch_embeds is not None and not self.cross_attn_decoder:
             h = h + patch_embeds
 

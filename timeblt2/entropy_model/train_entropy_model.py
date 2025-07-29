@@ -32,14 +32,14 @@ class TrainingConfig:
     n_embd = 64
     dropout = 0.1
     bias = False
-    vocab_size = 512
+    vocab_size = 256
     
     # Data Configuration
     dataset_name = 'ETTm1'
     features = 'M'
-    quant_range = 5
+    quant_range = 8
     batch_size = 128
-    seq_len = 96
+    seq_len = 336
     block_size = seq_len
     
     # Training Hyperparameters
@@ -53,7 +53,7 @@ class TrainingConfig:
     
     # Learning Rate Schedule
     warmup_steps = 0
-    min_lr_factor = 0.1
+    min_lr_factor = 0.05
     decay_lr = True
     
     # Training Control

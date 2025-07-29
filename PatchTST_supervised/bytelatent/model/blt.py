@@ -826,6 +826,7 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         # ByteLatent modules
         self.local_encoder = create_local_encoder(args)
         self.global_transformer = create_global_transformer(args)
+        # self.flatten = create_local_encoder(args)
         self.local_decoder = create_local_decoder(args)
         self.encoder_hash_tok_embedding = init_embeddings(
             args,
@@ -858,15 +859,17 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         assert args.vocab_size > 0, "vocab_size must be greater than 0"
 
         # Patcher module
+        # print(args.patch_size, args.patching_mode, args.patching_threshold, args.patching_threshold_add, args.monotonicity, args.max_patch_length, args.patching_batch_size)
         if args.patch_in_forward:
             self.patcher = Patcher(
                 PatcherArgs(
                     patch_size=args.patch_size,
                     patching_mode=args.patching_mode,
-                    patching_threshold=args.patching_threshold,
-                    patching_threshold_add=args.patching_threshold_add,
+                    threshold=args.patching_threshold,
+                    threshold_add=args.patching_threshold_add,
                     monotonicity=args.monotonicity,
                     max_patch_length=args.max_patch_length,
+                    patching_batch_size=args.patching_batch_size,
                 )
             )
 
@@ -886,12 +889,11 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         ), f"ngram_ids must be a tensor or None, but was: {type(ngram_ids)}"
 
         bs, N = tokens.shape  # Batch size and sequence length
-        patch_lengths = torch.full((bs, 24), 4).to('cuda')
+        # patch_lengths = torch.full((bs, 24), 4).to('cuda')
 
         # Get megabyte inputs
         nb_boe = int(0 if self.patching_mode != "" else self.patch_size - 1)
-        # print(f"patching mode={self.patching_mode}")
-        # print(f"nb_boe={nb_boe}")
+
 
         local_encoder_tokens, _, local_decoder_tokens = get_blt_input(
             tokens=tokens,
@@ -913,6 +915,7 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
                 include_next_token=True,
                 threshold=self.patcher.threshold,
             )
+
         else:
             if nb_boe > 0:
                 patch_lengths[:, 0] += nb_boe
@@ -974,6 +977,8 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         #                   Local Encoder
         # ------------------------------------------------
         local_encoder_embeds = None
+        # print(f"p_length shape: {patch_lengths.shape}")
+        # print(patch_lengths[0])
         # Local encoder
         (h_encoder, h_cross), cache_encoder = self.local_encoder(
             tokens=local_encoder_tokens,
@@ -983,7 +988,7 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
             num_patches=patch_lengths.shape[1],
             patch_ids=patch_ids,
         )
-        
+        # print(f"h_cross: {h_cross[0]}")
 
 
         # Downsampling
@@ -1011,16 +1016,14 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         eos_patch_ids = patch_ids[rows, cols]
         global_tokens[rows, eos_patch_ids] = self.eos_id
 
-        # Return Embeddings Before Global Transformer
-        # return h
-    
+
         h, _ = self.global_transformer(
             embeds=h,
             tokens=global_tokens,
         )
 
         # Return Embeddings After Global Transformer
-        return h
+        # return h[:, 0:21, :]   # Return the last token embedding after global transformer
 
         # ------------------------------------------------
         #                   Unpatching
@@ -1067,6 +1070,7 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
             tokens=local_decoder_tokens,
             cross_mask=cross_attn_mask_dec,
         )
+
         return output
 
     def init_weights(self):
