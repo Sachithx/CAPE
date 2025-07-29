@@ -30,7 +30,7 @@ do
       --enc_in 7 \
       --e_layers 5 \
       --n_heads 8 \
-      --d_model 32 \
+      --d_model 16 \
       --d_ff 256 \
       --dropout 0.1\
       --fc_dropout 0.1\
@@ -43,7 +43,7 @@ do
       --lradj 'TST'\
       --pct_start 0.4\
       --itr 1 \
-      --batch_size 256 \
+      --batch_size 128 \
       --learning_rate 0.0001 \
       >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
 done

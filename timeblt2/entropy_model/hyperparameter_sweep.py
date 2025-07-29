@@ -23,16 +23,16 @@ class SweepConfig:
     """Hyperparameter sweep configuration"""
     
     # Fixed Hardware Configuration
-    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
     dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16'
     
     # Fixed Data Configuration
-    dataset_name = 'ETTm1'
+    dataset_name = 'ETTm2'
     features = 'M'
     batch_size = 128
-    seq_len = 96
+    seq_len = 672
     block_size = seq_len
     
     # Fixed Training Hyperparameters
@@ -82,9 +82,10 @@ HYPERPARAMETER_GRID = {
 # Alternative: Predefined "smart" combinations to reduce search space
 SMART_COMBINATIONS = [
     # # Small models
-    # {'n_layer': 2, 'n_head': 2, 'n_embd': 32, 'quant_range': 8, 'vocab_size': 256},
-    # {'n_layer': 2, 'n_head': 4, 'n_embd': 64, 'quant_range': 8, 'vocab_size': 512},
-    # {'n_layer': 3, 'n_head': 4, 'n_embd': 64, 'quant_range': 12, 'vocab_size': 512},
+    {'n_layer': 2, 'n_head': 2, 'n_embd': 16, 'quant_range': 4, 'vocab_size': 256},
+    {'n_layer': 2, 'n_head': 2, 'n_embd': 32, 'quant_range': 8, 'vocab_size': 256},
+    {'n_layer': 2, 'n_head': 4, 'n_embd': 64, 'quant_range': 8, 'vocab_size': 512},
+    {'n_layer': 3, 'n_head': 4, 'n_embd': 64, 'quant_range': 12, 'vocab_size': 512},
     
     # # Medium models
     # {'n_layer': 3, 'n_head': 6, 'n_embd': 96, 'quant_range': 12, 'vocab_size': 1024},

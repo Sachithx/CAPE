@@ -6,7 +6,7 @@ from utils.patch_utils import build_tokenizer
 
 ## Training Args
 vocab_size = 256
-quant_range = 8
+quant_range = 5
 seq_len = 336
 
 # Initialize components
@@ -27,31 +27,31 @@ model_args = ByteLatentTransformerArgs(
     local_attention_window_len=seq_len,        # Local window, 128 is sufficient for small models
 
     dim_global=64,                        # Lower than default 512
-    dim_local_encoder=32,
-    dim_local_decoder=32,
+    dim_local_encoder=64,
+    dim_local_decoder=64,
 
     n_layers_global=2,
     n_layers_local_encoder=2,
     n_layers_local_decoder=2,
 
     n_heads_global=4,                      # Reduce heads
-    n_heads_local_encoder=2,
-    n_heads_local_decoder=2,
+    n_heads_local_encoder=4,
+    n_heads_local_decoder=4,
 
     patch_size=8,
     patch_in_forward=True,                # Patch in forward pass
     patching_batch_size=512,
     patching_device="cuda",               # Use CPU for patching in small model
     patching_mode="entropy",
-    patching_threshold=0.4,
+    patching_threshold=0.3,
     patching_threshold_add=0.2,           # No additional threshold
-    max_patch_length=16,
+    max_patch_length=8,
     monotonicity=True,            # Monotonic patching
     pad_to_max_length=True,
 
     cross_attn_encoder=True,
     cross_attn_decoder=True,
-    cross_attn_k=2,
+    cross_attn_k=1,
     cross_attn_nheads=2,
     cross_attn_all_layers_encoder=True,
     cross_attn_all_layers_decoder=True,
