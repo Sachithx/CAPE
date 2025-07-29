@@ -37,14 +37,33 @@ if __name__ == '__main__':
     # DLinear
     #parser.add_argument('--individual', action='store_true', default=False, help='DLinear: a linear layer for each variate(channel) individually')
 
-    # PatchTST
+    # CAPE-TST
+    parser.add_argument('--vocab_size', type=int, default=256, help='vocabulary size for byte-level tokenization')
+    parser.add_argument('--quant_range', type=int, default=6, help='quantization range for byte-level tokenization')
+    # parser.add_argument('--seq_len', type=int, default=96, help='maximum sequence length')
+    parser.add_argument('--n_layers_local_encoder', type=int, default=2, help='number of local encoder layers')
+    parser.add_argument('--n_layers_local_decoder', type=int, default=2, help='number of local decoder layers')
+    parser.add_argument('--n_layers_global', type=int, default=2, help='number of global layers')   
+    parser.add_argument('--n_heads_local_encoder', type=int, default=4, help='number of local encoder heads')
+    parser.add_argument('--n_heads_local_decoder', type=int, default=4, help='number of local decoder heads')
+    parser.add_argument('--n_heads_global', type=int, default=4, help='number of global heads')
+    parser.add_argument('--dim_global', type=int, default=32, help='dimension of global representation')
+    parser.add_argument('--dim_local_encoder', type=int, default=16, help='dimension of local encoder representation')
+    parser.add_argument('--dim_local_decoder', type=int, default=16, help='dimension of local decoder representation')
     parser.add_argument('--fc_dropout', type=float, default=0.05, help='fully connected dropout')
-    parser.add_argument('--head_dropout', type=float, default=0.0, help='head dropout')
-    parser.add_argument('--patch_len', type=int, default=16, help='patch length')
+    parser.add_argument('--head_dropout', type=float, default=0.05, help='head dropout')
+    parser.add_argument('--patch_size', type=int, default=16, help='patch length')
+    parser.add_argument('--max_patch_length', type=int, default=16, help='maximum patch length')
+    parser.add_argument('--patching_batch_size', type=int, default=512, help='batch size for patching')
+    parser.add_argument('--patching_threshold', type=float, default=0.3, help='patching threshold')
+    parser.add_argument('--patching_threshold_add', type=float, default=0.2, help='additional patching threshold')
+    parser.add_argument('--monotonicity', type=int, default=1, help='monotonic patching; True 1 False 0')
+    parser.add_argument('--cross_attn_k', type=int, default=1, help='cross attention key dimension')
+    parser.add_argument('--cross_attn_nheads', type=int, default=4, help='number of cross attention heads')
     parser.add_argument('--stride', type=int, default=8, help='stride')
     parser.add_argument('--padding_patch', default='end', help='None: None; end: padding on the end')
     parser.add_argument('--revin', type=int, default=1, help='RevIN; True 1 False 0')
-    parser.add_argument('--affine', type=int, default=0, help='RevIN-affine; True 1 False 0')
+    parser.add_argument('--affine', type=int, default=1, help='RevIN-affine; True 1 False 0')
     parser.add_argument('--subtract_last', type=int, default=0, help='0: subtract mean; 1: subtract last')
     parser.add_argument('--decomposition', type=int, default=0, help='decomposition; True 1 False 0')
     parser.add_argument('--kernel_size', type=int, default=25, help='decomposition-kernel')
@@ -117,23 +136,21 @@ if __name__ == '__main__':
     if args.is_training:
         for ii in range(args.itr):
             # setting record of experiments
-            setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
-                args.model_id,
-                args.model,
-                args.data,
-                args.features,
-                args.seq_len,
-                args.label_len,
-                args.pred_len,
-                args.d_model,
-                args.n_heads,
-                args.e_layers,
-                args.d_layers,
-                args.d_ff,
-                args.factor,
-                args.embed,
-                args.distil,
-                args.des,ii)
+            setting = (
+                f"{args.model}_{args.data}"          # PatchTST_ETTm1
+                f"_SL{args.seq_len}"                 # SL96
+                f"_PL{args.pred_len}"                # PL96 / PL192 …
+                f"_GL{args.n_layers_global}"         # GL2   (global layers)
+                f"_EL{args.n_layers_local_encoder}"  # EL2   (local‑enc layers)
+                f"_DL{args.n_layers_local_decoder}"  # DL2   (local‑dec layers)
+                f"_GD{args.dim_global}"              # GD32  (global dim)
+                f"_DD{args.dim_local_decoder}"       # LD16  (local‑dec dim)
+                f"_ED{args.dim_local_encoder}"       # LE16  (local‑enc
+                f"_GH{args.n_heads_global}"       # GH4   (global heads)
+                f"_EH{args.n_heads_local_encoder}"    # EH4   (local‑enc heads)
+                f"_DH{args.n_heads_local_decoder}"    # DH4   (
+            )
+
 
             exp = Exp(args)  # set experiments
             print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
@@ -149,22 +166,20 @@ if __name__ == '__main__':
             torch.cuda.empty_cache()
     else:
         ii = 0
-        setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(args.model_id,
-                                                                                                    args.model,
-                                                                                                    args.data,
-                                                                                                    args.features,
-                                                                                                    args.seq_len,
-                                                                                                    args.label_len,
-                                                                                                    args.pred_len,
-                                                                                                    args.d_model,
-                                                                                                    args.n_heads,
-                                                                                                    args.e_layers,
-                                                                                                    args.d_layers,
-                                                                                                    args.d_ff,
-                                                                                                    args.factor,
-                                                                                                    args.embed,
-                                                                                                    args.distil,
-                                                                                                    args.des, ii)
+        setting = (
+            f"{args.model}_{args.data}"          # PatchTST_ETTm1
+            f"_SL{args.seq_len}"                 # SL96
+            f"_PL{args.pred_len}"                # PL96 / PL192 …
+            f"_GL{args.n_layers_global}"         # GL2   (global layers)
+            f"_EL{args.n_layers_local_encoder}"  # EL2   (local‑enc layers)
+            f"_DL{args.n_layers_local_decoder}"  # DL2   (local‑dec layers)
+            f"_GD{args.dim_global}"              # GD32  (global dim)
+            f"_DD{args.dim_local_decoder}"       # LD16  (local‑dec dim)
+            f"_ED{args.dim_local_encoder}"       # LE16  (local‑enc
+            f"_GH{args.n_heads_global}"       # GH4   (global heads)
+            f"_EH{args.n_heads_local_encoder}"    # EH4   (local‑enc heads)
+            f"_DH{args.n_heads_local_decoder}"    # DH4   (
+        )
 
         exp = Exp(args)  # set experiments
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))

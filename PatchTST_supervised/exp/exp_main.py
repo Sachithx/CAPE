@@ -38,9 +38,13 @@ class Exp_Main(Exp_Basic):
             'checkpoints': args.checkpoints,
             'use_multi_gpu': args.use_multi_gpu,
             'devices': args.devices if hasattr(args, 'devices') else None,
+            'random_seed': args.random_seed if hasattr(args, 'random_seed') else None,
+            'enc_in': args.enc_in if hasattr(args, 'enc_in') else None,
+            'lradj': args.lradj if hasattr(args, 'lradj') else None,
+            'pct_start': args.pct_start if hasattr(args, 'pct_start') else None,
         }
         
-        # Add model-specific parameters
+        # Add model-specific parameters (original transformer-based models)
         if hasattr(args, 'd_model'):
             self.wandb_config.update({
                 'd_model': args.d_model,
@@ -52,11 +56,52 @@ class Exp_Main(Exp_Basic):
                 'activation': args.activation,
             })
             
+        # Add PatchTST-specific parameters
         if hasattr(args, 'patch_len') and 'TST' in args.model:
             self.wandb_config.update({
                 'patch_len': args.patch_len,
                 'stride': args.stride,
             })
+            
+        # Add new PatchTST parameters from the script
+        if 'PatchTST' in args.model or 'TST' in args.model:
+            patch_params = {
+                'vocab_size': getattr(args, 'vocab_size', None),
+                'quant_range': getattr(args, 'quant_range', None),
+                'n_layers_local_encoder': getattr(args, 'n_layers_local_encoder', None),
+                'n_layers_local_decoder': getattr(args, 'n_layers_local_decoder', None),
+                'n_layers_global': getattr(args, 'n_layers_global', None),
+                'n_heads_local_encoder': getattr(args, 'n_heads_local_encoder', None),
+                'n_heads_local_decoder': getattr(args, 'n_heads_local_decoder', None),
+                'n_heads_global': getattr(args, 'n_heads_global', None),
+                'dim_global': getattr(args, 'dim_global', None),
+                'dim_local_encoder': getattr(args, 'dim_local_encoder', None),
+                'dim_local_decoder': getattr(args, 'dim_local_decoder', None),
+                'cross_attn_k': getattr(args, 'cross_attn_k', None),
+                'cross_attn_nheads': getattr(args, 'cross_attn_nheads', None),
+                'fc_dropout': getattr(args, 'fc_dropout', None),
+                'head_dropout': getattr(args, 'head_dropout', None),
+                'patch_size': getattr(args, 'patch_size', None),
+                'max_patch_length': getattr(args, 'max_patch_length', None),
+                'patching_threshold': getattr(args, 'patching_threshold', None),
+                'patching_threshold_add': getattr(args, 'patching_threshold_add', None),
+                'monotonicity': getattr(args, 'monotonicity', None),
+                'patching_batch_size': getattr(args, 'patching_batch_size', None),
+            }
+            # Only add non-None parameters
+            patch_params = {k: v for k, v in patch_params.items() if v is not None}
+            self.wandb_config.update(patch_params)
+        
+        # Add general parameters that might be present
+        general_params = {
+            'd_ff': getattr(args, 'd_ff', None),
+            'dropout': getattr(args, 'dropout', None),
+            'des': getattr(args, 'des', None),
+            'itr': getattr(args, 'itr', None),
+        }
+        # Only add non-None parameters
+        general_params = {k: v for k, v in general_params.items() if v is not None}
+        self.wandb_config.update(general_params)
         
         # Flag to track if wandb is initialized
         self.wandb_initialized = False
@@ -154,7 +199,7 @@ class Exp_Main(Exp_Basic):
     def train(self, setting):
         # Initialize wandb run
         wandb.init(
-            project="time-series-forecasting",
+            project=f"time-series-forecasting-{self.args.data}",
             name=setting,
             config=self.wandb_config,
             reinit=True
@@ -193,13 +238,22 @@ class Exp_Main(Exp_Basic):
                                             epochs = self.args.train_epochs,
                                             max_lr = self.args.learning_rate)
 
-        # Log dataset info
-        wandb.log({
+        # Log dataset info and training configuration
+        dataset_info = {
             'train_samples': len(train_data),
             'val_samples': len(vali_data),
             'test_samples': len(test_data),
-            'train_steps_per_epoch': train_steps
-        })
+            'train_steps_per_epoch': train_steps,
+            'scheduler_type': 'OneCycleLR',
+            'optimizer_type': 'Adam',
+            'criterion_type': 'MSELoss'
+        }
+        
+        # Add batch size information
+        if hasattr(self.args, 'patching_batch_size'):
+            dataset_info['patching_batch_size'] = self.args.patching_batch_size
+            
+        wandb.log(dataset_info)
 
         for epoch in range(self.args.train_epochs):
             iter_count = 0
@@ -252,12 +306,24 @@ class Exp_Main(Exp_Basic):
                     train_loss.append(loss.item())
 
                 # Log batch-level metrics
-                wandb.log({
+                batch_metrics = {
                     'batch_loss': loss.item(),
                     'epoch': epoch,
                     'batch': i,
                     'learning_rate': model_optim.param_groups[0]['lr']
-                }, step=epoch * train_steps + i)
+                }
+                
+                # Add gradient norm if available
+                if hasattr(self.model, 'parameters'):
+                    total_norm = 0
+                    for p in self.model.parameters():
+                        if p.grad is not None:
+                            param_norm = p.grad.data.norm(2)
+                            total_norm += param_norm.item() ** 2
+                    total_norm = total_norm ** (1. / 2)
+                    batch_metrics['gradient_norm'] = total_norm
+                
+                wandb.log(batch_metrics, step=epoch * train_steps + i)
 
                 if (i + 1) % 100 == 0:
                     print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
@@ -266,10 +332,12 @@ class Exp_Main(Exp_Basic):
                     print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
                     
                     # Log training progress
-                    wandb.log({
+                    progress_metrics = {
                         'training_speed_s_per_iter': speed,
-                        'estimated_time_left_s': left_time
-                    }, step=epoch * train_steps + i)
+                        'estimated_time_left_s': left_time,
+                        'progress_percent': ((epoch * train_steps + i) / (self.args.train_epochs * train_steps)) * 100
+                    }
+                    wandb.log(progress_metrics, step=epoch * train_steps + i)
                     
                     iter_count = 0
                     time_now = time.time()
@@ -297,24 +365,39 @@ class Exp_Main(Exp_Basic):
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
             
             # Log epoch-level metrics
-            wandb.log({
+            epoch_metrics = {
                 'epoch_train_loss': train_loss,
                 'epoch_val_loss': vali_loss,
                 'epoch_test_loss': test_loss,
                 'epoch_duration': epoch_duration,
-                'epoch': epoch + 1
-            })
+                'epoch': epoch + 1,
+                'current_lr': model_optim.param_groups[0]['lr']
+            }
+            
+            # Add scheduler-specific metrics
+            if hasattr(scheduler, 'get_last_lr'):
+                epoch_metrics['scheduler_lr'] = scheduler.get_last_lr()[0]
+                
+            wandb.log(epoch_metrics)
             
             early_stopping(vali_loss, self.model, path)
             if early_stopping.early_stop:
                 print("Early stopping")
-                wandb.log({'early_stopping_epoch': epoch + 1})
+                wandb.log({
+                    'early_stopping_epoch': epoch + 1,
+                    'best_val_loss': early_stopping.val_loss_min,
+                    'training_completed': False
+                })
                 break
 
             if self.args.lradj != 'TST':
                 adjust_learning_rate(model_optim, scheduler, epoch + 1, self.args)
             else:
                 print('Updating learning rate to {}'.format(scheduler.get_last_lr()[0]))
+
+        # Log training completion
+        if not early_stopping.early_stop:
+            wandb.log({'training_completed': True, 'final_epoch': self.args.train_epochs})
 
         best_model_path = path + '/' + 'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path))
@@ -328,7 +411,7 @@ class Exp_Main(Exp_Basic):
         # Initialize wandb for testing if not already initialized
         if not self.wandb_initialized:
             wandb.init(
-                project="time-series-forecasting",
+                project=f"time-series-forecasting-{self.args.data}",
                 name=f"{setting}_test",
                 config=self.wandb_config,
                 reinit=True
@@ -436,7 +519,7 @@ class Exp_Main(Exp_Basic):
         mae, mse, rmse, mape, mspe, rse, corr = metric(preds, trues)
         print('mse:{}, mae:{}, rse:{}'.format(mse, mae, rse))
         
-        # Log test metrics to wandb
+        # Log test metrics to wandb with PatchTST context
         test_metrics = {
             'test_mse': mse,
             'test_mae': mae,
@@ -444,7 +527,10 @@ class Exp_Main(Exp_Basic):
             'test_mape': mape,
             'test_mspe': mspe,
             'test_rse': rse,
-            'test_correlation': corr
+            'test_correlation': corr,
+            'test_samples_count': len(preds),
+            'prediction_horizon': self.args.pred_len,
+            'input_sequence_length': self.args.seq_len
         }
         wandb.log(test_metrics)
         
@@ -525,7 +611,7 @@ class Exp_Main(Exp_Basic):
         # Initialize wandb for prediction if not already initialized
         if not self.wandb_initialized:
             wandb.init(
-                project="time-series-forecasting",
+                project=f"time-series-forecasting-{self.args.data}",
                 name=f"{setting}_prediction",
                 config=self.wandb_config,
                 reinit=True
@@ -594,14 +680,25 @@ class Exp_Main(Exp_Basic):
         preds = np.array(preds)
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
 
-        # Log prediction statistics
+        # Log prediction statistics with PatchTST-specific context
         pred_stats = {
             'prediction_mean': float(np.mean(preds)),
             'prediction_std': float(np.std(preds)),
             'prediction_min': float(np.min(preds)),
             'prediction_max': float(np.max(preds)),
-            'num_predictions': len(preds)
+            'num_predictions': len(preds),
+            'prediction_shape': list(preds.shape),
+            'model_type': self.args.model
         }
+        
+        # Add PatchTST-specific prediction stats
+        if 'PatchTST' in self.args.model or 'TST' in self.args.model:
+            pred_stats.update({
+                'patch_based_prediction': True,
+                'effective_patch_size': getattr(self.args, 'patch_size', None),
+                'max_patch_length': getattr(self.args, 'max_patch_length', None)
+            })
+        
         wandb.log(pred_stats)
 
         # result save
@@ -614,6 +711,59 @@ class Exp_Main(Exp_Basic):
         
         # Upload predictions to wandb
         wandb.save(pred_file)
+        
+        # Create prediction analysis plots
+        if len(preds) > 0:
+            # Plot prediction distribution across time steps
+            fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+            
+            # Time series of mean predictions
+            mean_preds = np.mean(preds, axis=0)
+            if len(mean_preds.shape) > 1:
+                for feature_idx in range(min(3, mean_preds.shape[1])):
+                    axes[0, 0].plot(mean_preds[:, feature_idx], 
+                                   label=f'Feature {feature_idx}', alpha=0.7)
+            else:
+                axes[0, 0].plot(mean_preds, label='Mean Prediction', alpha=0.7)
+            axes[0, 0].set_title('Mean Predictions Over Time')
+            axes[0, 0].set_xlabel('Time Steps')
+            axes[0, 0].set_ylabel('Predicted Value')
+            axes[0, 0].legend()
+            
+            # Prediction variance over time
+            var_preds = np.var(preds, axis=0)
+            if len(var_preds.shape) > 1:
+                for feature_idx in range(min(3, var_preds.shape[1])):
+                    axes[0, 1].plot(var_preds[:, feature_idx], 
+                                   label=f'Feature {feature_idx}', alpha=0.7)
+            else:
+                axes[0, 1].plot(var_preds, label='Prediction Variance', alpha=0.7)
+            axes[0, 1].set_title('Prediction Variance Over Time')
+            axes[0, 1].set_xlabel('Time Steps')
+            axes[0, 1].set_ylabel('Variance')
+            axes[0, 1].legend()
+            
+            # Distribution of all predictions
+            axes[1, 0].hist(preds.flatten(), bins=50, alpha=0.7, edgecolor='black')
+            axes[1, 0].set_title('Distribution of All Predictions')
+            axes[1, 0].set_xlabel('Predicted Value')
+            axes[1, 0].set_ylabel('Frequency')
+            
+            # Sample predictions (first few samples)
+            sample_size = min(5, len(preds))
+            for i in range(sample_size):
+                if len(preds[i].shape) > 1:
+                    axes[1, 1].plot(preds[i, :, 0], alpha=0.6, label=f'Sample {i}')
+                else:
+                    axes[1, 1].plot(preds[i], alpha=0.6, label=f'Sample {i}')
+            axes[1, 1].set_title('Sample Individual Predictions')
+            axes[1, 1].set_xlabel('Time Steps')
+            axes[1, 1].set_ylabel('Predicted Value')
+            axes[1, 1].legend()
+            
+            plt.tight_layout()
+            wandb.log({"prediction_analysis": wandb.Image(fig)})
+            plt.close(fig)
         
         # Finish wandb run
         wandb.finish()

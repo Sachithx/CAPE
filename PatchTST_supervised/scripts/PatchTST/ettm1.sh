@@ -5,7 +5,7 @@ fi
 if [ ! -d "./logs/LongForecasting" ]; then
     mkdir ./logs/LongForecasting
 fi
-seq_len=336
+seq_len=96
 model_name=PatchTST
 
 root_path_name=./dataset/
@@ -28,15 +28,28 @@ do
       --seq_len $seq_len \
       --pred_len $pred_len \
       --enc_in 7 \
-      --e_layers 5 \
-      --n_heads 8 \
-      --d_model 16 \
+      --vocab_size 256 \
+      --quant_range 6 \
+      --n_layers_local_encoder 2 \
+      --n_layers_local_decoder 2 \
+      --n_layers_global 2 \
+      --n_heads_local_encoder 4 \
+      --n_heads_local_decoder 4 \
+      --n_heads_global 4 \
+      --dim_global 32 \
+      --dim_local_encoder 16 \
+      --dim_local_decoder 16 \
+      --cross_attn_k 2 \
+      --cross_attn_nheads 4 \
       --d_ff 256 \
-      --dropout 0.1\
-      --fc_dropout 0.1\
-      --head_dropout 0.1\
-      --patch_len 4\
-      --stride 8\
+      --dropout 0.05\
+      --fc_dropout 0.05\
+      --head_dropout 0.05\
+      --patch_size 16\
+      --max_patch_length 16\
+      --patching_threshold 0.3\
+      --patching_threshold_add 0.2\
+      --monotonicity 1\
       --des 'Exp' \
       --train_epochs 100\
       --patience 20\
@@ -44,6 +57,7 @@ do
       --pct_start 0.4\
       --itr 1 \
       --batch_size 128 \
+      --patching_batch_size 512 \
       --learning_rate 0.0001 \
       >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
 done

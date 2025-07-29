@@ -11,60 +11,38 @@ import numpy as np
 #from collections import OrderedDict
 from layers.PatchTST_layers import *
 from layers.RevIN import RevIN
-from patcher_backbone import patcher_backbone, tokenizer
+from patcher_backbone import CAPE_TST_backbone
 
 
 # Cell
 class PatchTST_backbone(nn.Module):
-    def __init__(self, c_in:int, context_window:int, target_window:int, patch_len:int, stride:int, max_seq_len:Optional[int]=1024, 
-                 n_layers:int=3, d_model=128, n_heads=16, d_k:Optional[int]=None, d_v:Optional[int]=None,
-                 d_ff:int=256, norm:str='BatchNorm', attn_dropout:float=0., dropout:float=0., act:str="gelu", key_padding_mask:bool='auto',
-                 padding_var:Optional[int]=None, attn_mask:Optional[Tensor]=None, res_attention:bool=True, pre_norm:bool=False, store_attn:bool=False,
-                 pe:str='zeros', learn_pe:bool=True, fc_dropout:float=0., head_dropout = 0, padding_patch = None,
-                 pretrain_head:bool=False, head_type = 'flatten', individual = False, revin = True, affine = True, subtract_last = False,
-                 verbose:bool=False, **kwargs):
+    def __init__(self, configs, pretrain_head:bool=False, head_type = 'flatten', individual = False, revin = True, affine = True, 
+                 subtract_last = False, **kwargs):
         
         super().__init__()
         
         # RevIn
         self.revin = revin
-        if self.revin: self.revin_layer = RevIN(c_in, affine=affine, subtract_last=subtract_last)
+        if self.revin: self.revin_layer = RevIN(configs.enc_in, affine=affine, subtract_last=subtract_last)
         
          # -------------- model replace ------------------
 
-        # Patching 
-        # self.patch_len = patch_len
-        # self.stride = stride
-        # self.padding_patch = padding_patch
-        # patch_num = int((context_window - patch_len)/stride + 1)
-        # if padding_patch == 'end': # can be modified to general case
-        #     self.padding_patch_layer = nn.ReplicationPad1d((0, stride)) 
-        #     patch_num += 1
-        
-        # Backbone 
-        # self.backbone = TSTiEncoder(c_in, patch_num=context_window, patch_len=patch_len, max_seq_len=max_seq_len,
-        #                         n_layers=n_layers, d_model=d_model, n_heads=n_heads, d_k=d_k, d_v=d_v, d_ff=d_ff,
-        #                         attn_dropout=attn_dropout, dropout=dropout, act=act, key_padding_mask=key_padding_mask, padding_var=padding_var,
-        #                         attn_mask=attn_mask, res_attention=res_attention, pre_norm=pre_norm, store_attn=store_attn,
-        #                         pe=pe, learn_pe=learn_pe, verbose=verbose, **kwargs)
-
         # -----------------------------------------------
-        self.backbone = patcher_backbone 
-        self.tokenizer = tokenizer
+        self.backbone, self.tokenizer = CAPE_TST_backbone(configs).place()
+        
         # -------------- model replace end --------------
 
         # Head
-        self.head_nf = d_model * 336 #* 96 # number of input components for head (patches)
-        print(f"d_model: {d_model}, head_nf: {self.head_nf}")
-        self.n_vars = c_in
+        self.head_nf = configs.dim_local_decoder * 96 #* 96 # number of input components for head (patches)
+        self.n_vars = configs.enc_in
         self.pretrain_head = pretrain_head
         self.head_type = head_type
         self.individual = individual
 
         if self.pretrain_head: 
-            self.head = self.create_pretrain_head(self.head_nf, c_in, fc_dropout) # custom head passed as a partial func with all its kwargs
+            self.head = self.create_pretrain_head(self.head_nf, configs.enc_in, configs.fc_dropout) # custom head passed as a partial func with all its kwargs
         elif head_type == 'flatten': 
-            self.head = Flatten_Head(self.individual, self.n_vars, self.head_nf, target_window, head_dropout=head_dropout)
+            self.head = Flatten_Head(self.individual, self.n_vars, self.head_nf, configs.pred_len, head_dropout=configs.head_dropout)
         
     
     def forward(self, z):                                                                   # z: [bs x nvars x seq_len]
@@ -88,7 +66,7 @@ class PatchTST_backbone(nn.Module):
 
         # -----------------------------------------------
         z = z.reshape(bs * nvars, seq_len)
-        z, _, _ = tokenizer.context_input_transform(z.cpu())
+        z, _, _ = self.tokenizer.context_input_transform(z.cpu())
         z = z.cuda()
         z = self.backbone(z)                                                                    # z: [bs * nvars x patch_num x d_model]
 
