@@ -826,7 +826,7 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         # ByteLatent modules
         self.local_encoder = create_local_encoder(args)
         self.global_transformer = create_global_transformer(args)
-        # self.flatten = create_local_encoder(args)
+        # self.flatten = create_flatten(args)
         self.local_decoder = create_local_decoder(args)
         self.encoder_hash_tok_embedding = init_embeddings(
             args,
@@ -872,6 +872,35 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
                     patching_batch_size=args.patching_batch_size,
                 )
             )
+    
+    def masked_mean(self, x, mask):
+        # x: (B, L, D), mask: (B, L) with True = padding
+        valid = ~mask  # True for actual tokens
+        x = x * valid.unsqueeze(-1)
+        lengths = valid.sum(dim=1, keepdim=True).clamp(min=1)  # avoid div by zero
+        return x.sum(dim=1, keepdim=True) / lengths.unsqueeze(-1)  # (B, 1, D)
+
+    def masked_max(self, x, mask):
+        # x: (B, L, D), mask: (B, L), where True = padding
+        neg_inf = torch.finfo(x.dtype).min  # usually -inf or large negative
+        x_masked = x.masked_fill(mask.unsqueeze(-1), neg_inf)
+        return x_masked.max(dim=1, keepdim=True).values  # shape: (B, 1, D)
+
+    def make_dummy_patch_ids_and_lengths(self, mask):
+        # mask: (B, L), True = padding, False = valid
+        patch_ids = mask.long()  # 0 for valid, 1 for padding
+
+        # Compute patch lengths for each sample in batch
+        patch_lengths = torch.stack([
+            (~mask).sum(dim=1),  # patch 0: count of valid tokens
+            mask.sum(dim=1)      # patch 1: count of padded tokens
+        ], dim=1)  # shape: (B, 2)
+
+        # Generate random token ids between [100, 150)
+        tokens = torch.randint(100, 150, mask.shape, dtype=torch.long, device=mask.device)
+
+        return patch_ids, patch_lengths, tokens
+
 
     def get_output_seq_len(self):
         return self.max_seqlen
@@ -915,7 +944,7 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
                 include_next_token=True,
                 threshold=self.patcher.threshold,
             )
-            # print(patch_lengths)
+            # print(patch_lengths[3])
         else:
             if nb_boe > 0:
                 patch_lengths[:, 0] += nb_boe
@@ -1016,12 +1045,40 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         eos_patch_ids = patch_ids[rows, cols]
         global_tokens[rows, eos_patch_ids] = self.eos_id
 
-
+        # global_mask = (h.abs().sum(dim=-1) == 0)
         h, _ = self.global_transformer(
             embeds=h,
             tokens=global_tokens,
         )
 
+        # ------------------------------------------------
+        #                   Flattening
+        # ------------------------------------------------
+
+        # masked_max = self.masked_max(h, global_mask)
+        # return masked_max
+        # d_patch_ids, d_patch_lengths, d_tokens = self.make_dummy_patch_ids_and_lengths(global_mask)
+        # d_cross_attn_mask_enc = cross_attn_mask(
+        #     d_patch_ids,
+        #     d_patch_lengths,
+        #     h.shape[1],
+        #     patches_as_queries=True,
+        #     cross_attn_k=1,
+        #     window=self.cross_attn_window_encoder,
+        #     block_mask=self.cross_attn_use_flex_attention,
+        # )
+        # (_, h_flat), cache_encoder = self.flatten(
+        #     tokens=d_tokens,
+        #     embeds=h,
+        #     patch_embeds=None,
+        #     cross_mask=d_cross_attn_mask_enc,
+        #     num_patches=d_patch_lengths.shape[1],
+        #     patch_ids=d_patch_ids,
+        # )
+        # return h_flat
+    
+        # return h_flat[:, 0].unsqueeze(1)  # Return the first token embedding after flattening
+        # print(f"masked_mean: {masked_mean.shape}")
         # Return Embeddings After Global Transformer
         # return h[:, 0:21, :]   # Return the last token embedding after global transformer
 

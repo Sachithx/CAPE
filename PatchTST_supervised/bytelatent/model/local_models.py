@@ -240,6 +240,7 @@ class LocalEncoder(LocalModelBase):
             assert (
                 self.expects_hash_embeddings
             ), "Not expecting embeddings to be passed."
+
             return embeds
         else:
             return self.tok_embeddings(tokens)
@@ -257,15 +258,15 @@ class LocalEncoder(LocalModelBase):
     ):
 
         bs, seqlen = tokens.shape
-        # if mask is None:
-        #     mask = create_causal_mask(
-        #         seqlen,
-        #         self.attn_impl,
-        #         self.attn_bias_type,
-        #         sliding_window=self.sliding_window,
-        #         tokens=tokens,
-        #         eos_id=self.eos_id,
-        #     )
+        if mask is None:
+            mask = create_causal_mask(
+                seqlen,
+                self.attn_impl,
+                self.attn_bias_type,
+                sliding_window=self.sliding_window,
+                tokens=tokens,
+                eos_id=self.eos_id,
+            )
 
         # ----------------------------------------------
         #           Token Embedding 
@@ -363,15 +364,15 @@ class LocalDecoder(LocalModelBase):
         bs, seqlen = tokens.shape
         assert embeds is not None, "Embeddings must be provided"
 
-        # if mask is None:
-        #     mask = create_causal_mask(
-        #         seqlen,
-        #         self.attn_impl,
-        #         self.attn_bias_type,
-        #         sliding_window=self.sliding_window,
-        #         tokens=tokens,
-        #         eos_id=self.eos_id,
-        #     )
+        if mask is None:
+            mask = create_causal_mask(
+                seqlen,
+                self.attn_impl,
+                self.attn_bias_type,
+                sliding_window=self.sliding_window,
+                tokens=tokens,
+                eos_id=self.eos_id,
+            )
 
         h = embeds
         # print(f"h/emmbd shape: {embeds.shape}")

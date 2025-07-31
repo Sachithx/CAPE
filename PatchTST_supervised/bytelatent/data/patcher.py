@@ -362,9 +362,10 @@ def find_entropy_patch_start_ids(
         1
     ]  # remove the first preds because they will be start of patches.
     # entropies = entropies[:, 1:]
+    # threshold = None
     if threshold is None:
         num_patches = seq_len // patch_size
-        patch_start_ids = entropies.topk(num_patches - 2, dim=1).indices
+        patch_start_ids = entropies.topk(int(num_patches) - 2, dim=1).indices
         patch_start_ids = patch_start_ids.sort(dim=1).values
     else:
         # Assumes that there is at least one token going over the threshold

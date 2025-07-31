@@ -33,7 +33,7 @@ class PatchTST_backbone(nn.Module):
         # -------------- model replace end --------------
 
         # Head
-        self.head_nf = configs.dim_local_decoder * 96 #* 96 # number of input components for head (patches)
+        self.head_nf = configs.dim_local_decoder * configs.seq_len  # number of input components for head (patches)
         self.n_vars = configs.enc_in
         self.pretrain_head = pretrain_head
         self.head_type = head_type

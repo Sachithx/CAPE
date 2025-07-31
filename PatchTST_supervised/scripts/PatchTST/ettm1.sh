@@ -14,7 +14,7 @@ model_id_name=ETTm1
 data_name=ETTm1
 
 random_seed=2021
-for pred_len in 96 #192 336 720
+for pred_len in 96 192 336 720
 do
     python -u run_longExp.py \
       --random_seed $random_seed \
@@ -33,22 +33,22 @@ do
       --n_layers_local_encoder 2 \
       --n_layers_local_decoder 2 \
       --n_layers_global 2 \
+      --dim_global 16 \
+      --dim_local_encoder 8 \
+      --dim_local_decoder 8 \
+      --cross_attn_k 1 \
       --n_heads_local_encoder 4 \
       --n_heads_local_decoder 4 \
       --n_heads_global 4 \
-      --dim_global 32 \
-      --dim_local_encoder 16 \
-      --dim_local_decoder 16 \
-      --cross_attn_k 2 \
       --cross_attn_nheads 4 \
-      --d_ff 256 \
-      --dropout 0.05\
-      --fc_dropout 0.05\
-      --head_dropout 0.05\
-      --patch_size 16\
-      --max_patch_length 16\
-      --patching_threshold 0.3\
-      --patching_threshold_add 0.2\
+      --cross_attn_window_encoder 96\
+      --cross_attn_window_decoder 96\
+      --local_attention_window_len 96\
+      --dropout 0.04\
+      --patch_size 8\
+      --max_patch_length 8\
+      --patching_threshold 0.2\
+      --patching_threshold_add 0.15\
       --monotonicity 1\
       --des 'Exp' \
       --train_epochs 100\
