@@ -202,7 +202,7 @@ class Exp_Main(Exp_Basic):
     def train(self, setting):
         # Initialize wandb run
         wandb.init(
-            project=f"time-series-forecasting-{self.args.data}",
+            project=f"time-series-forecasting-{self.args.data_path}",
             name=setting,
             config=self.wandb_config,
             reinit=True

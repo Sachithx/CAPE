@@ -258,6 +258,7 @@ class LocalEncoder(LocalModelBase):
     ):
 
         bs, seqlen = tokens.shape
+
         if mask is None:
             mask = create_causal_mask(
                 seqlen,

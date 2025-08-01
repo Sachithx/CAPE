@@ -944,7 +944,7 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
                 include_next_token=True,
                 threshold=self.patcher.threshold,
             )
-            # print(patch_lengths[3])
+            # print(patch_lengths[3], tokens[3])
         else:
             if nb_boe > 0:
                 patch_lengths[:, 0] += nb_boe
