@@ -35,11 +35,11 @@ class TrainingConfig:
     vocab_size = 256
     
     # Data Configuration
-    dataset_name = 'exchange_rate'  # Example dataset
+    dataset_name = 'electricity'  # Example dataset
     features = 'M'
     quant_range = 3
-    batch_size = 256
-    seq_len = 512
+    batch_size = 2
+    seq_len = 96
     block_size = seq_len
     
     # Training Hyperparameters
@@ -47,7 +47,7 @@ class TrainingConfig:
     weight_decay = 0.05
     beta1 = 0.9
     beta2 = 0.95
-    epochs = 50
+    epochs = 150
     grad_accumulation_steps = 1
     clip_grad = 1.0
     
@@ -57,7 +57,7 @@ class TrainingConfig:
     decay_lr = True
     
     # Training Control
-    patience = 5  # Early stopping patience
+    patience = 10  # Early stopping patience
     save_every = 10
     seed = 42
     compile = True
