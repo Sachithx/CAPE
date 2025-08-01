@@ -27,9 +27,9 @@ class TrainingConfig:
     dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16'
     
     # Model Architecture
-    n_layer = 3
+    n_layer = 2
     n_head = 4
-    n_embd = 64
+    n_embd = 16
     dropout = 0.1
     bias = False
     vocab_size = 256
@@ -37,9 +37,9 @@ class TrainingConfig:
     # Data Configuration
     dataset_name = 'weather'
     features = 'M'
-    quant_range = 8
+    quant_range = 6
     batch_size = 128
-    seq_len = 336
+    seq_len = 512
     block_size = seq_len
     
     # Training Hyperparameters
@@ -57,7 +57,7 @@ class TrainingConfig:
     decay_lr = True
     
     # Training Control
-    patience = 10  # Early stopping patience
+    patience = 5  # Early stopping patience
     save_every = 10
     seed = 42
     compile = True
@@ -66,7 +66,7 @@ class TrainingConfig:
     output_dir = "output"
     
     # W&B Configuration
-    wandb_project = "Entropy Model"
+    wandb_project = f"Entropy Model - {dataset_name}"
     wandb_entity = None  # Set to your wandb username/team if needed
     wandb_run_name = None  # Will be auto-generated if None
     wandb_tags = ["time-series", "transformer", "dynamic-patching"]
@@ -151,6 +151,11 @@ def evaluate(model, val_loader, tokenizer, device):
     for batch_x, batch_y, _, _ in val_loader:
         x = batch_x.float().squeeze(-1).to(device)
         y = batch_y.float().squeeze(-1).to(device)
+        x = x.permute(0,2,1)    # x: [Batch, Channel, Input length]
+        y = y.permute(0,2,1)    # y: [Batch, Channel, Target length]
+        bs, nvars, seq_len = x.shape
+        x = x.reshape(bs * nvars, seq_len)
+        y = y.reshape(bs * nvars, seq_len)
         
         # Tokenize inputs
         token_ids, attention_mask, tokenizer_state = tokenizer.context_input_transform(x.cpu())
@@ -375,7 +380,7 @@ def train_epoch(model, train_loader, optimizer, tokenizer, scaler, config, epoch
         bs, nvars, seq_len = x.shape
         x = x.reshape(bs * nvars, seq_len)
         y = y.reshape(bs * nvars, seq_len)
-        print(f"Shape of x: {x.shape}, y: {y.shape}")
+        # print(f"Shape of x: {x.shape}, y: {y.shape}")
         # Get learning rate
         min_lr = config.learning_rate * config.min_lr_factor
         lr = get_lr(iteration, total_steps, config.warmup_steps, 
