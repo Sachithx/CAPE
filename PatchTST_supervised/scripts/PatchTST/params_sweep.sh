@@ -16,10 +16,10 @@ fi
 # Dataset configuration
 model_name=PatchTST
 root_path_name=./dataset/
-data_path_name=ETTm1.csv
-model_id_name=ETTm1
-data_name=ETTm1
-random_seed=2021
+data_path_name=ETTm2.csv
+model_id_name=ETTm2
+data_name=ETTm2
+random_seed=2025
 pred_len=96
 
 echo "Starting ETTm1 Parameter Sweep Experiments"
@@ -47,7 +47,6 @@ run_experiment() {
     local config_name=${17}
     
     # Calculate derived parameters based on constraints
-    local d_ff=$((dim_global * 4))
     local dim_local_encoder=$dim_local
     local dim_local_decoder=$dim_local
     
@@ -117,7 +116,6 @@ run_experiment() {
       --dim_local_decoder $dim_local_decoder \
       --cross_attn_k $cross_attn_k \
       --cross_attn_nheads $cross_attn_nheads \
-      --d_ff $d_ff \
       --dropout $dropout \
       --fc_dropout $dropout \
       --head_dropout $dropout \
@@ -399,7 +397,7 @@ def main():
             metrics = parse_log_file(filepath)
             
             if metrics and metrics['mse'] is not None:
-                config_name = filename.replace('PatchTST_ETTm1_', '').replace('.log', '')
+                config_name = filename.replace('PatchTST_ETTm2_', '').replace('.log', '')
                 results.append({
                     'config': config_name,
                     'filename': filename,

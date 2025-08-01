@@ -12,20 +12,19 @@ logger = logging.getLogger()
 
 
 def load_entropy_model(
-        entropy_model_checkpoint_dir="/home/AD/sachith/CAPE-TST/timeblt2/bytelatent/data/pretrained_entropy_model/", 
-        state_dict_path="/home/AD/sachith/CAPE-TST/timeblt2/bytelatent/data/pretrained_entropy_model/entropy_model.pt", 
+        entropy_model_checkpoint_dir="/home/AD/sachith/CAPE-TST/PatchTST_supervised/bytelatent/data/pretrained_entropy_model/", 
+        state_dict_path="/home/AD/sachith/CAPE-TST/PatchTST_supervised/bytelatent/data/pretrained_entropy_model/ETTh2.pt", 
         device="cuda"
         ):
-    
     with open(os.path.join(entropy_model_checkpoint_dir, "params.json")) as fr:
         reloaded = json.loads(fr.read())
-
+    print(reloaded)
     torch.set_default_dtype(torch.bfloat16)
     model_params = reloaded["entropy_model"]
     logger.warning(
         "Update checkpoint to load attn and sliding window args from checkpoint"
     )
-
+    print("Loading entropy model with params:", model_params)
     entropy_model_args = GPTConfig(
         n_layer=model_params["n_layer"],
         n_head=model_params["n_head"],

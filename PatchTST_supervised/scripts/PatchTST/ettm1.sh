@@ -14,7 +14,7 @@ model_id_name=ETTm1
 data_name=ETTm1
 
 random_seed=2021
-for pred_len in 96 192 336 720
+for pred_len in 96 # 192 336 720
 do
     python -u run_longExp.py \
       --random_seed $random_seed \
@@ -32,8 +32,8 @@ do
       --quant_range 6 \
       --n_layers_local_encoder 2 \
       --n_layers_local_decoder 2 \
-      --n_layers_global 2 \
-      --dim_global 16 \
+      --n_layers_global 3 \
+      --dim_global 32 \
       --dim_local_encoder 8 \
       --dim_local_decoder 8 \
       --cross_attn_k 1 \

@@ -13,7 +13,7 @@ data_path_name=traffic.csv
 model_id_name=traffic
 data_name=custom
 
-random_seed=2021
+random_seed=2025
 for pred_len in 96 192 336 720
 do
     python -u run_longExp.py \
@@ -27,20 +27,37 @@ do
       --features M \
       --seq_len $seq_len \
       --pred_len $pred_len \
-      --enc_in 862 \
-      --e_layers 3 \
-      --n_heads 16 \
-      --d_model 128 \
-      --d_ff 256 \
+      --enc_in 7 \
+      --vocab_size 256 \
+      --quant_range 4 \
+      --n_layers_local_encoder 2 \
+      --n_layers_local_decoder 2 \
+      --n_layers_global 2 \
+      --dim_global 16 \
+      --dim_local_encoder 8 \
+      --dim_local_decoder 8 \
+      --cross_attn_k 1 \
+      --n_heads_local_encoder 2 \
+      --n_heads_local_decoder 2 \
+      --n_heads_global 4 \
+      --cross_attn_nheads 2 \
+      --cross_attn_window_encoder 48\
+      --cross_attn_window_decoder 48\
+      --local_attention_window_len 48\
       --dropout 0.2\
-      --fc_dropout 0.2\
-      --head_dropout 0\
-      --patch_len 16\
-      --stride 8\
+      --patch_size 8\
+      --max_patch_length 8\
+      --patching_threshold 0.3\
+      --patching_threshold_add 0.1\
+      --monotonicity 1\
       --des 'Exp' \
-      --train_epochs 100\
-      --patience 10\
+      --train_epochs 180\
+      --patience 100\
       --lradj 'TST'\
-      --pct_start 0.2\
-      --itr 1 --batch_size 24 --learning_rate 0.0001 >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
+      --pct_start 0.4\
+      --itr 1 \
+      --batch_size 128 \
+      --patching_batch_size 128 \
+      --learning_rate 0.0001 \
+      >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
 done
