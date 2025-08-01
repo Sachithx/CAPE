@@ -87,6 +87,9 @@ class Exp_Main(Exp_Basic):
                 'patching_threshold_add': getattr(args, 'patching_threshold_add', None),
                 'monotonicity': getattr(args, 'monotonicity', None),
                 'patching_batch_size': getattr(args, 'patching_batch_size', None),
+                'cross_attn_window_encoder': getattr(args, 'cross_attn_window_encoder', None),
+                'cross_attn_window_decoder': getattr(args, 'cross_attn_window_decoder', None),
+                'local_attention_window_len': getattr(args, 'local_attention_window_len', None)
             }
             # Only add non-None parameters
             patch_params = {k: v for k, v in patch_params.items() if v is not None}

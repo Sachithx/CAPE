@@ -14,7 +14,7 @@ model_id_name=weather
 data_name=custom
 
 random_seed=2025
-for pred_len in 96 # 192 336 720
+for pred_len in 96 192 336 720
 do
     python -u run_longExp.py \
       --random_seed $random_seed \
@@ -33,31 +33,31 @@ do
       --n_layers_local_encoder 2 \
       --n_layers_local_decoder 2 \
       --n_layers_global 2 \
-      --dim_global 16 \
-      --dim_local_encoder 8 \
-      --dim_local_decoder 8 \
+      --dim_global 32 \
+      --dim_local_encoder 32 \
+      --dim_local_decoder 32 \
       --cross_attn_k 1 \
       --n_heads_local_encoder 4 \
       --n_heads_local_decoder 4 \
       --n_heads_global 4 \
       --cross_attn_nheads 4 \
-      --cross_attn_window_encoder 96\
-      --cross_attn_window_decoder 96\
-      --local_attention_window_len 96\
-      --dropout 0.04\
+      --cross_attn_window_encoder 48\
+      --cross_attn_window_decoder 48\
+      --local_attention_window_len 48\
+      --dropout 0.2\
       --patch_size 8\
       --max_patch_length 8\
-      --patching_threshold 0.3\
+      --patching_threshold 0.4\
       --patching_threshold_add 0.1\
       --monotonicity 1\
       --des 'Exp' \
-      --train_epochs 100\
-      --patience 20\
+      --train_epochs 150\
+      --patience 50\
       --lradj 'TST'\
       --pct_start 0.4\
       --itr 1 \
-      --batch_size 128 \
-      --patching_batch_size 512 \
-      --learning_rate 0.0001 \
+      --batch_size 256 \
+      --patching_batch_size 1024 \
+      --learning_rate 0.0005 \
       >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
 done
