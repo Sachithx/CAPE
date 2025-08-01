@@ -35,10 +35,10 @@ class TrainingConfig:
     vocab_size = 256
     
     # Data Configuration
-    dataset_name = 'weather'
+    dataset_name = 'exchange_rate'  # Example dataset
     features = 'M'
-    quant_range = 6
-    batch_size = 128
+    quant_range = 3
+    batch_size = 256
     seq_len = 512
     block_size = seq_len
     
