@@ -214,3 +214,4 @@ PatchTST_supervised/wandb/
 PatchTST_supervised/checkpoints/
 PatchTST_supervised/dataset
 PatchTST_supervised/entropy_model/wandb/
+PatchTST_supervised/entropy_model/dataset/

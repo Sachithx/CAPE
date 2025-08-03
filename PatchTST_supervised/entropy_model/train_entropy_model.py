@@ -35,11 +35,11 @@ class TrainingConfig:
     vocab_size = 256
     
     # Data Configuration
-    dataset_name = 'electricity'  # Example dataset
+    dataset_name = 'ETTm1'  # Example dataset
     features = 'M'
     quant_range = 3
     batch_size = 2
-    seq_len = 96
+    seq_len = 2048
     block_size = seq_len
     
     # Training Hyperparameters

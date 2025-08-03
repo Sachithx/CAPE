@@ -13,7 +13,7 @@ logger = logging.getLogger()
 
 def load_entropy_model(
         entropy_model_checkpoint_dir="/home/AD/sachith/CAPE-TST/PatchTST_supervised/bytelatent/data/pretrained_entropy_model/", 
-        state_dict_path="/home/AD/sachith/CAPE-TST/PatchTST_supervised/bytelatent/data/pretrained_entropy_model/weather.pt", 
+        state_dict_path="/home/AD/sachith/CAPE-TST/PatchTST_supervised/bytelatent/data/pretrained_entropy_model/ETTm1.pt", 
         device="cuda"
         ):
     with open(os.path.join(entropy_model_checkpoint_dir, "params.json")) as fr:

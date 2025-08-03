@@ -13,8 +13,8 @@ data_path_name=ETTm1.csv
 model_id_name=ETTm1
 data_name=ETTm1
 
-random_seed=2021
-for pred_len in 96 # 192 336 720
+random_seed=2025
+for pred_len in 96 192 336 720
 do
     python -u run_longExp.py \
       --random_seed $random_seed \
@@ -33,13 +33,13 @@ do
       --n_layers_local_encoder 2 \
       --n_layers_local_decoder 2 \
       --n_layers_global 3 \
-      --dim_global 32 \
+      --dim_global 16 \
       --dim_local_encoder 8 \
       --dim_local_decoder 8 \
-      --cross_attn_k 1 \
       --n_heads_local_encoder 4 \
       --n_heads_local_decoder 4 \
       --n_heads_global 4 \
+      --cross_attn_k 1 \
       --cross_attn_nheads 4 \
       --cross_attn_window_encoder 96\
       --cross_attn_window_decoder 96\
@@ -57,7 +57,7 @@ do
       --pct_start 0.4\
       --itr 1 \
       --batch_size 128 \
-      --patching_batch_size 512 \
+      --patching_batch_size 1024 \
       --learning_rate 0.0001 \
       >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
 done

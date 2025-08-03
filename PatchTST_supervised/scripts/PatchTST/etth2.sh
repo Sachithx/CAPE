@@ -5,7 +5,7 @@ fi
 if [ ! -d "./logs/LongForecasting" ]; then
     mkdir ./logs/LongForecasting
 fi
-seq_len=96
+seq_len=192
 model_name=PatchTST
 
 root_path_name=./dataset/
@@ -29,25 +29,25 @@ do
       --pred_len $pred_len \
       --enc_in 7 \
       --vocab_size 256 \
-      --quant_range 6 \
+      --quant_range 3 \
       --n_layers_local_encoder 2 \
       --n_layers_local_decoder 2 \
-      --n_layers_global 1 \
-      --dim_global 8 \
+      --n_layers_global 2 \
+      --dim_global 16 \
       --dim_local_encoder 8 \
       --dim_local_decoder 8 \
       --cross_attn_k 1 \
-      --n_heads_local_encoder 1 \
-      --n_heads_local_decoder 1 \
+      --n_heads_local_encoder 2 \
+      --n_heads_local_decoder 2 \
       --n_heads_global 2 \
-      --cross_attn_nheads 1 \
-      --cross_attn_window_encoder 12\
-      --cross_attn_window_decoder 12\
-      --local_attention_window_len 12\
-      --dropout 0.1\
-      --patch_size 12\
-      --max_patch_length 12\
-      --patching_threshold 0.4\
+      --cross_attn_nheads 2 \
+      --cross_attn_window_encoder 96\
+      --cross_attn_window_decoder 96\
+      --local_attention_window_len 96\
+      --dropout 0.2\
+      --patch_size 10\
+      --max_patch_length 10\
+      --patching_threshold 0.3\
       --patching_threshold_add 0.1\
       --monotonicity 1\
       --des 'Exp' \
