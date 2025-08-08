@@ -213,5 +213,6 @@ timeblt2/wandb/
 PatchTST_supervised/wandb/
 PatchTST_supervised/checkpoints/
 PatchTST_supervised/dataset
+CAPE-TST/dataset
 PatchTST_supervised/entropy_model/wandb/
 PatchTST_supervised/entropy_model/dataset/
