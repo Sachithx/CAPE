@@ -14,7 +14,7 @@ model_id_name=weather
 data_name=custom
 
 random_seed=2025
-for pred_len in 96 192 336 720
+for pred_len in 336 720
 do
     python -u run_longExp.py \
       --random_seed $random_seed \
@@ -22,6 +22,7 @@ do
       --root_path $root_path_name \
       --data_path $data_path_name \
       --model_id $model_id_name_$seq_len'_'$pred_len \
+      --model_id_name $model_id_name \
       --model $model_name \
       --data $data_name \
       --features M \
@@ -33,18 +34,19 @@ do
       --n_layers_local_encoder 2 \
       --n_layers_local_decoder 2 \
       --n_layers_global 2 \
-      --dim_global 8 \
-      --dim_local_encoder 8 \
-      --dim_local_decoder 8 \
+      --dim_global 32 \
+      --dim_local_encoder 16 \
+      --dim_local_decoder 16 \
       --cross_attn_k 1 \
-      --n_heads_local_encoder 2 \
-      --n_heads_local_decoder 2 \
-      --n_heads_global 2 \
-      --cross_attn_nheads 2 \
+      --n_heads_local_encoder 4 \
+      --n_heads_local_decoder 4 \
+      --n_heads_global 4 \
+      --cross_attn_nheads 4 \
       --cross_attn_window_encoder 96\
       --cross_attn_window_decoder 96\
       --local_attention_window_len 96\
       --dropout 0.1\
+      --multiple_of 128\
       --patch_size 8\
       --max_patch_length 8\
       --patching_threshold 0.15\

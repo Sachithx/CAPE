@@ -9,19 +9,22 @@ seq_len=96
 model_name=PatchTST
 
 root_path_name=./dataset/
+entropy_model_checkpoint_dir=./entropy_model_checkpoints/
 data_path_name=ETTh1.csv
-model_id_name=ETTh1
+model_id_name=ETTh1  
 data_name=ETTh1
 
 random_seed=2025
-for pred_len in 96 192 336 720
+for pred_len in 720
 do
     python -u run_longExp.py \
       --random_seed $random_seed \
       --is_training 1 \
       --root_path $root_path_name \
+      --entropy_model_checkpoint_dir $entropy_model_checkpoint_dir \
       --data_path $data_path_name \
       --model_id $model_id_name_$seq_len'_'$pred_len \
+      --model_id_name $model_id_name \
       --model $model_name \
       --data $data_name \
       --features M \
@@ -37,14 +40,15 @@ do
       --dim_local_encoder 8 \
       --dim_local_decoder 8 \
       --cross_attn_k 1 \
-      --n_heads_local_encoder 2 \
-      --n_heads_local_decoder 2 \
+      --n_heads_local_encoder 4 \
+      --n_heads_local_decoder 4 \
       --n_heads_global 4 \
-      --cross_attn_nheads 2 \
-      --cross_attn_window_encoder 48\
-      --cross_attn_window_decoder 48\
-      --local_attention_window_len 48\
-      --dropout 0.2\
+      --cross_attn_nheads 4 \
+      --cross_attn_window_encoder 96\
+      --cross_attn_window_decoder 96\
+      --local_attention_window_len 96\
+      --dropout 0.1\
+      --multiple_of 128\
       --patch_size 8\
       --max_patch_length 8\
       --patching_threshold 0.3\
@@ -52,12 +56,12 @@ do
       --monotonicity 1\
       --des 'Exp' \
       --train_epochs 180\
-      --patience 100\
+      --patience 80\
       --lradj 'TST'\
       --pct_start 0.4\
       --itr 1 \
-      --batch_size 128 \
-      --patching_batch_size 128 \
+      --batch_size 256 \
+      --patching_batch_size 1792 \
       --learning_rate 0.0001 \
       >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
 done

@@ -418,23 +418,23 @@ def patch_ids_from_lengths(patch_lengths, seq_len):
 
 class ByteLatentTransformerArgs(BaseTransformerArgs):
     # Basic model configuration
-    seed: int = 42
-    vocab_size: int = -1
-    dim: int = 512
-    n_layers: int = 8
-    n_heads: int = 8
+    seed: int = 2025
+    vocab_size: int = 256
+    # dim: int = 16
+    # n_layers: int = 8
+    # n_heads: int = 8
     # TODO: What is the purpose of this parameter?
     weight_tying: bool = False
-    patch_in_forward: bool = False
+    patch_in_forward: bool = True
 
     # Architecture and dimensions
     dim_token: int | None = None
-    dim_global: int = 512
-    dim_local_decoder: int = 512
-    dim_local_encoder: int = 512
-    n_layers_global: int = 8
-    n_layers_local_decoder: int = 8
-    n_layers_local_encoder: int = 8
+    dim_global: int = 64
+    dim_local_decoder: int = 32
+    dim_local_encoder: int = 32
+    n_layers_global: int = 2
+    n_layers_local_decoder: int = 2
+    n_layers_local_encoder: int = 2
 
     # Tokenization and patching
     patch_size: float | None = None
@@ -497,7 +497,7 @@ class ByteLatentTransformerArgs(BaseTransformerArgs):
     norm_type: str = "rmsnorm"
 
     # Additional configurations
-    multiple_of: int = 256
+    multiple_of: int = 128
     ffn_dim_multiplier: float = 1.0
     dropout: float = 0
     output_size: int = -1
@@ -519,12 +519,13 @@ class ByteLatentTransformerArgs(BaseTransformerArgs):
     encoder_ngram_to_size_str: str | None = None
 
     # Model architecture params
+    dataset_name: str | None = None
     entropy_model_checkpoint_dir: str | None = None
-    entropy_model_is_ngram_model: bool = False
+    # entropy_model_is_ngram_model: bool = False
     downsampling_by_pooling: str | None = None
-    n_heads_global: int = 8
-    n_heads_local_decoder: int = 8
-    n_heads_local_encoder: int = 8
+    n_heads_global: int = 4
+    n_heads_local_decoder: int = 4
+    n_heads_local_encoder: int = 4
     n_kv_heads: int | None = None
     n_kv_heads_global: int | None = None
     conv_kernel_size: int | None = None
@@ -863,7 +864,8 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         if args.patch_in_forward:
             self.patcher = Patcher(
                 PatcherArgs(
-                    patch_size=args.patch_size,
+                    entropy_model_checkpoint_dir=args.entropy_model_checkpoint_dir,
+                    dataset_name=args.dataset_name,
                     patching_mode=args.patching_mode,
                     threshold=args.patching_threshold,
                     threshold_add=args.patching_threshold_add,
@@ -935,6 +937,7 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         # ------------------------------------------------
         #                   Patching
         # ------------------------------------------------
+        patch_lengths = torch.ones(bs, 96, dtype=torch.int64, device=tokens.device) * 1
         if patch_lengths is None:
             assert (
                 getattr(self, "patcher", None) is not None
@@ -1006,8 +1009,6 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         #                   Local Encoder
         # ------------------------------------------------
         local_encoder_embeds = None
-        # print(f"p_length shape: {patch_lengths.shape}")
-        # print(patch_lengths[0])
         # Local encoder
         (h_encoder, h_cross), cache_encoder = self.local_encoder(
             tokens=local_encoder_tokens,
@@ -1017,7 +1018,6 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
             num_patches=patch_lengths.shape[1],
             patch_ids=patch_ids,
         )
-        # print(f"h_cross: {h_cross[0]}")
 
 
         # Downsampling
@@ -1050,37 +1050,6 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
             embeds=h,
             tokens=global_tokens,
         )
-
-        # ------------------------------------------------
-        #                   Flattening
-        # ------------------------------------------------
-
-        # masked_max = self.masked_max(h, global_mask)
-        # return masked_max
-        # d_patch_ids, d_patch_lengths, d_tokens = self.make_dummy_patch_ids_and_lengths(global_mask)
-        # d_cross_attn_mask_enc = cross_attn_mask(
-        #     d_patch_ids,
-        #     d_patch_lengths,
-        #     h.shape[1],
-        #     patches_as_queries=True,
-        #     cross_attn_k=1,
-        #     window=self.cross_attn_window_encoder,
-        #     block_mask=self.cross_attn_use_flex_attention,
-        # )
-        # (_, h_flat), cache_encoder = self.flatten(
-        #     tokens=d_tokens,
-        #     embeds=h,
-        #     patch_embeds=None,
-        #     cross_mask=d_cross_attn_mask_enc,
-        #     num_patches=d_patch_lengths.shape[1],
-        #     patch_ids=d_patch_ids,
-        # )
-        # return h_flat
-    
-        # return h_flat[:, 0].unsqueeze(1)  # Return the first token embedding after flattening
-        # print(f"masked_mean: {masked_mean.shape}")
-        # Return Embeddings After Global Transformer
-        # return h[:, 0:21, :]   # Return the last token embedding after global transformer
 
         # ------------------------------------------------
         #                   Unpatching

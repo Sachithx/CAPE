@@ -14,7 +14,7 @@ model_id_name=ETTm2
 data_name=ETTm2
 
 random_seed=2025
-for pred_len in 96 #192 336 720
+for pred_len in 96 192 336 720
 do
     python -u run_longExp.py \
       --random_seed $random_seed \
@@ -29,7 +29,7 @@ do
       --pred_len $pred_len \
       --enc_in 7 \
       --vocab_size 256 \
-      --quant_range 5 \
+      --quant_range 6 \
       --n_layers_local_encoder 2 \
       --n_layers_local_decoder 2 \
       --n_layers_global 2 \
@@ -56,8 +56,8 @@ do
       --lradj 'TST'\
       --pct_start 0.4\
       --itr 1 \
-      --batch_size 64 \
-      --patching_batch_size 128 \
+      --batch_size 128 \
+      --patching_batch_size 448 \
       --learning_rate 0.00006 \
       >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
 done

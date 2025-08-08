@@ -47,20 +47,20 @@ class Exp_Main(Exp_Basic):
         # Add model-specific parameters (original transformer-based models)
         if hasattr(args, 'd_model'):
             self.wandb_config.update({
-                'd_model': args.d_model,
-                'n_heads': args.n_heads,
-                'd_ff': args.d_ff,
-                'e_layers': args.e_layers,
-                'd_layers': args.d_layers,
+                # 'd_model': args.d_model,
+                # 'n_heads': args.n_heads,
+                # 'd_ff': args.d_ff,
+                # 'e_layers': args.e_layers,
+                # 'd_layers': args.d_layers,
                 'dropout': args.dropout,
-                'activation': args.activation,
+                # 'activation': args.activation,
             })
             
         # Add PatchTST-specific parameters
         if hasattr(args, 'patch_len') and 'TST' in args.model:
             self.wandb_config.update({
-                'patch_len': args.patch_len,
-                'stride': args.stride,
+                # 'patch_len': args.patch_len,
+                # 'stride': args.stride,
             })
             
         # Add new PatchTST parameters from the script
@@ -97,7 +97,7 @@ class Exp_Main(Exp_Basic):
         
         # Add general parameters that might be present
         general_params = {
-            'd_ff': getattr(args, 'd_ff', None),
+            # 'd_ff': getattr(args, 'd_ff', None),
             'dropout': getattr(args, 'dropout', None),
             'des': getattr(args, 'des', None),
             'itr': getattr(args, 'itr', None),

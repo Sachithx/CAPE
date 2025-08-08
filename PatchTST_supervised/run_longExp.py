@@ -9,7 +9,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Autoformer & Transformer family for Time Series Forecasting')
 
     # random seed
-    parser.add_argument('--random_seed', type=int, default=2021, help='random seed')
+    parser.add_argument('--random_seed', type=int, default=2025, help='random seed')
 
     # basic config
     parser.add_argument('--is_training', type=int, required=True, default=1, help='status')
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     # data loader
     parser.add_argument('--data', type=str, required=True, default='ETTm1', help='dataset type')
     parser.add_argument('--root_path', type=str, default='./data/ETT/', help='root path of the data file')
-    parser.add_argument('--data_path', type=str, default='ETTh1.csv', help='data file')
+    parser.add_argument('--data_path', type=str, default='ETTm1.csv', help='data file')
     parser.add_argument('--features', type=str, default='M',
                         help='forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate')
     parser.add_argument('--target', type=str, default='OT', help='target feature in S or MS task')
@@ -40,7 +40,8 @@ if __name__ == '__main__':
     # CAPE-TST
     parser.add_argument('--vocab_size', type=int, default=256, help='vocabulary size for byte-level tokenization')
     parser.add_argument('--quant_range', type=int, default=6, help='quantization range for byte-level tokenization')
-    # parser.add_argument('--seq_len', type=int, default=96, help='maximum sequence length')
+    parser.add_argument('--entropy_model_checkpoint_dir', type=str, default='./entropy_model_checkpoints/', help='directory for entropy model checkpoints')
+    parser.add_argument('--model_id_name', type=str, default='ETTm1', help='model ID name for saved entropy checkpoints')
     parser.add_argument('--n_layers_local_encoder', type=int, default=2, help='number of local encoder layers')
     parser.add_argument('--n_layers_local_decoder', type=int, default=2, help='number of local decoder layers')
     parser.add_argument('--n_layers_global', type=int, default=2, help='number of global layers')   
@@ -54,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--cross_attn_window_decoder', type=int, default=96, help='cross attention window size for decoder')
     parser.add_argument('--local_attention_window_len', type=int, default=96, help='local attention window length')
     parser.add_argument('--fc_dropout', type=float, default=0.05, help='fully connected dropout')
+    parser.add_argument('--multiple_of', type=int, default=128, help='multiple of 128 for efficient attention')
     parser.add_argument('--head_dropout', type=float, default=0.05, help='head dropout')
     parser.add_argument('--patch_size', type=int, default=16, help='patch length')
     parser.add_argument('--max_patch_length', type=int, default=16, help='maximum patch length')

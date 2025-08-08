@@ -20,15 +20,16 @@ from bytelatent.tokenizers.constants import BPE_ID, OFFSET
 
 class PatchingModeEnum(str, Enum):
     entropy = "entropy"
-    bpe = "bpe"
-    bpe_patcher = "bpe_patcher"
-    space = "space"
+    # bpe = "bpe"
+    # bpe_patcher = "bpe_patcher"
+    # space = "space"
     static = "static"
-    byte = "byte"
+    # byte = "byte"
 
 
 class PatcherArgs(BaseModel):
     patching_mode: PatchingModeEnum = PatchingModeEnum.entropy
+    dataset_name: str | None = None
     patching_device: str = "cuda"
     entropy_model_checkpoint_dir: str | None = None
     realtime_patching: bool = True
@@ -79,7 +80,7 @@ def calculate_entropies(
     with grad_context:
         entropies = []
         preds = []
-        max_length = getattr(entropy_model, "max_length", 2048)
+        max_length = getattr(entropy_model, "max_length", 96)
         batch_numel = max_length * patching_batch_size
         splits = torch.split(tokens.flatten(), batch_numel)
         for split in splits:
@@ -222,43 +223,43 @@ def patch_lengths_from_start_ids(patch_start_ids, seq_len):
     return patch_lengths
 
 
-def find_space_patch_start_ids(tokens):
-    bs, seq_len = tokens.shape
-    tokens_no_offset = tokens - OFFSET
-    patch_end_mask = (
-        (tokens_no_offset < ord("0"))
-        | ((ord("9") < tokens_no_offset) & (tokens_no_offset < ord("A")))
-        | ((ord("Z") < tokens_no_offset) & (tokens_no_offset < ord("a")))
-        | ((ord("z") < tokens_no_offset) & (tokens_no_offset < 0b1000_0000))
-        | (0b1100_0000 <= tokens_no_offset)
-    )
-    patch_end_mask[:, 1:] &= patch_end_mask[:, :-1].bitwise_not()
-    patch_end_mask |= tokens < OFFSET
+# def find_space_patch_start_ids(tokens):
+#     bs, seq_len = tokens.shape
+#     tokens_no_offset = tokens - OFFSET
+#     patch_end_mask = (
+#         (tokens_no_offset < ord("0"))
+#         | ((ord("9") < tokens_no_offset) & (tokens_no_offset < ord("A")))
+#         | ((ord("Z") < tokens_no_offset) & (tokens_no_offset < ord("a")))
+#         | ((ord("z") < tokens_no_offset) & (tokens_no_offset < 0b1000_0000))
+#         | (0b1100_0000 <= tokens_no_offset)
+#     )
+#     patch_end_mask[:, 1:] &= patch_end_mask[:, :-1].bitwise_not()
+#     patch_end_mask |= tokens < OFFSET
 
-    patch_start_mask = torch.cat(
-        [
-            torch.tensor([1, 1], device=tokens.device, dtype=torch.bool)
-            .unsqueeze(0)
-            .repeat(bs, 1),
-            patch_end_mask[:, 1:],
-        ],
-        dim=1,
-    )
-    max_patches = patch_start_mask.sum(dim=1).max()
+#     patch_start_mask = torch.cat(
+#         [
+#             torch.tensor([1, 1], device=tokens.device, dtype=torch.bool)
+#             .unsqueeze(0)
+#             .repeat(bs, 1),
+#             patch_end_mask[:, 1:],
+#         ],
+#         dim=1,
+#     )
+#     max_patches = patch_start_mask.sum(dim=1).max()
 
-    patch_ids = (
-        torch.arange(seq_len + 1, device=tokens.device).unsqueeze(0).repeat(bs, 1)
-    )
-    extra_patch_ids = torch.full(
-        (bs, seq_len + 1), seq_len + 1, dtype=torch.long, device=tokens.device
-    )
-    all_patch_ids = torch.cat((patch_ids, extra_patch_ids), dim=1)
-    patch_start_mask_padded = torch.cat((patch_start_mask, ~patch_start_mask), dim=1)
+#     patch_ids = (
+#         torch.arange(seq_len + 1, device=tokens.device).unsqueeze(0).repeat(bs, 1)
+#     )
+#     extra_patch_ids = torch.full(
+#         (bs, seq_len + 1), seq_len + 1, dtype=torch.long, device=tokens.device
+#     )
+#     all_patch_ids = torch.cat((patch_ids, extra_patch_ids), dim=1)
+#     patch_start_mask_padded = torch.cat((patch_start_mask, ~patch_start_mask), dim=1)
 
-    patch_start_ids = all_patch_ids[patch_start_mask_padded].reshape(bs, -1)[
-        :, :max_patches
-    ]
-    return patch_start_ids
+#     patch_start_ids = all_patch_ids[patch_start_mask_padded].reshape(bs, -1)[
+#         :, :max_patches
+#     ]
+#     return patch_start_ids
 
 
 def to_device(entropy_model, device=None):
@@ -269,70 +270,70 @@ def to_device(entropy_model, device=None):
     return entropy_model, device
 
 
-def model_pred_to_bpe_patching_pred(pred):
-    _, indices = torch.max(pred, dim=1)
-    return indices == BPE_ID
+# def model_pred_to_bpe_patching_pred(pred):
+#     _, indices = torch.max(pred, dim=1)
+#     return indices == BPE_ID
 
 
-def apply_bpe_patcher(tokens, bpe_patcher, patching_batch_size, device=None):
-    assert tokens.device == torch.device(
-        "cpu"
-    ), f"{tokens.device} != cpu expects tokens to be on cpu"
-    with torch.no_grad():
-        bpe_patcher_device, device = to_device(
-            bpe_patcher, device
-        )  # Get entropy model to right rank device.
-        bpe_patching_mask = []
-        max_length = getattr(bpe_patcher, "max_length", 8192)
-        batch_numel = max_length * patching_batch_size
-        splits = torch.split(tokens.flatten(), batch_numel)
-        for split in splits:
-            pad_size = (max_length - (split.numel() % max_length)) % max_length
-            pad = torch.zeros(
-                pad_size, dtype=split.dtype, device=split.device, requires_grad=False
-            )
-            split = torch.cat((split, pad), dim=0)
-            split = split.reshape(-1, max_length).to(device)
-            assert torch.all(split >= 0) and torch.all(split < 260)
-            pred = bpe_patcher_device(split)
-            pred_cpu = pred[0].cpu()
-            pred_cpu = pred_cpu.reshape(-1, pred_cpu.shape[-1])[
-                : split.numel() - pad_size, :
-            ]  # [batch_size * seq_len, vocab]
-            bpe_patching_pred = model_pred_to_bpe_patching_pred(pred_cpu)
-            bpe_patching_mask.append(bpe_patching_pred)
-        bpe_patching_mask = torch.cat(bpe_patching_mask, dim=0)
-        bpe_patching_mask = bpe_patching_mask.reshape(tokens.shape)
-    return bpe_patching_mask
+# def apply_bpe_patcher(tokens, bpe_patcher, patching_batch_size, device=None):
+#     assert tokens.device == torch.device(
+#         "cpu"
+#     ), f"{tokens.device} != cpu expects tokens to be on cpu"
+#     with torch.no_grad():
+#         bpe_patcher_device, device = to_device(
+#             bpe_patcher, device
+#         )  # Get entropy model to right rank device.
+#         bpe_patching_mask = []
+#         max_length = getattr(bpe_patcher, "max_length", 8192)
+#         batch_numel = max_length * patching_batch_size
+#         splits = torch.split(tokens.flatten(), batch_numel)
+#         for split in splits:
+#             pad_size = (max_length - (split.numel() % max_length)) % max_length
+#             pad = torch.zeros(
+#                 pad_size, dtype=split.dtype, device=split.device, requires_grad=False
+#             )
+#             split = torch.cat((split, pad), dim=0)
+#             split = split.reshape(-1, max_length).to(device)
+#             assert torch.all(split >= 0) and torch.all(split < 260)
+#             pred = bpe_patcher_device(split)
+#             pred_cpu = pred[0].cpu()
+#             pred_cpu = pred_cpu.reshape(-1, pred_cpu.shape[-1])[
+#                 : split.numel() - pad_size, :
+#             ]  # [batch_size * seq_len, vocab]
+#             bpe_patching_pred = model_pred_to_bpe_patching_pred(pred_cpu)
+#             bpe_patching_mask.append(bpe_patching_pred)
+#         bpe_patching_mask = torch.cat(bpe_patching_mask, dim=0)
+#         bpe_patching_mask = bpe_patching_mask.reshape(tokens.shape)
+#     return bpe_patching_mask
 
 
-def find_bpe_patcher_patch_start_ids(
-    tokens, bpe_patcher, patching_batch_size, device=None, include_next_token=True
-):
-    bs, seq_len = tokens.shape
+# def find_bpe_patcher_patch_start_ids(
+#     tokens, bpe_patcher, patching_batch_size, device=None, include_next_token=True
+# ):
+#     bs, seq_len = tokens.shape
 
-    first_ids = (
-        torch.tensor([0, 1], dtype=torch.long, device=tokens.device)
-        .unsqueeze(0)
-        .repeat(bs, 1)
-    )
-    preds_truncation_len = first_ids.shape[1]
-    token_input = tokens[:, 1:] if include_next_token else tokens[:, 1:-1]
-    if token_input.shape[1] >= 1:
-        patch_start_mask = apply_bpe_patcher(
-            token_input, bpe_patcher, patching_batch_size, device
-        )
-        assert (
-            patch_start_mask.shape[1]
-            == tokens.shape[1] + include_next_token - preds_truncation_len
-        ), f"{patch_start_mask.shape[1]} != {tokens.shape[1] + include_next_token - preds_truncation_len}"
-        patch_start_ids = patch_start_ids_from_patch_start_mask(patch_start_mask)
-        patch_start_ids = torch.cat(
-            (first_ids, patch_start_ids + preds_truncation_len), dim=1
-        )
-    else:
-        patch_start_ids = first_ids
-    return patch_start_ids
+#     first_ids = (
+#         torch.tensor([0, 1], dtype=torch.long, device=tokens.device)
+#         .unsqueeze(0)
+#         .repeat(bs, 1)
+#     )
+#     preds_truncation_len = first_ids.shape[1]
+#     token_input = tokens[:, 1:] if include_next_token else tokens[:, 1:-1]
+#     if token_input.shape[1] >= 1:
+#         patch_start_mask = apply_bpe_patcher(
+#             token_input, bpe_patcher, patching_batch_size, device
+#         )
+#         assert (
+#             patch_start_mask.shape[1]
+#             == tokens.shape[1] + include_next_token - preds_truncation_len
+#         ), f"{patch_start_mask.shape[1]} != {tokens.shape[1] + include_next_token - preds_truncation_len}"
+#         patch_start_ids = patch_start_ids_from_patch_start_mask(patch_start_mask)
+#         patch_start_ids = torch.cat(
+#             (first_ids, patch_start_ids + preds_truncation_len), dim=1
+#         )
+#     else:
+#         patch_start_ids = first_ids
+#     return patch_start_ids
 
 
 def find_entropy_patch_start_ids(
@@ -394,16 +395,16 @@ def rightpad(seq, pad_id, max_len):
     return seq + [pad_id] * (max_len - len(seq))
 
 
-def find_bpe_delim_patch_start_ids(tokens, delim):
-    ids = (tokens[:, :-1] == delim).nonzero(as_tuple=False)
-    out = [[0, 1] for _ in range(tokens.shape[0])]
-    for x, y in ids:
-        # start is at delim + 1, delim should be the last element in the patch.
-        out[x.item()].append(y.item() + 1)
-    max_len = max([len(elt) for elt in out])
-    out = [rightpad(elt, tokens.shape[1], max_len) for elt in out]
-    patch_start_ids = torch.tensor(out, dtype=tokens.dtype, device=tokens.device)
-    return patch_start_ids
+# def find_bpe_delim_patch_start_ids(tokens, delim):
+#     ids = (tokens[:, :-1] == delim).nonzero(as_tuple=False)
+#     out = [[0, 1] for _ in range(tokens.shape[0])]
+#     for x, y in ids:
+#         # start is at delim + 1, delim should be the last element in the patch.
+#         out[x.item()].append(y.item() + 1)
+#     max_len = max([len(elt) for elt in out])
+#     out = [rightpad(elt, tokens.shape[1], max_len) for elt in out]
+#     patch_start_ids = torch.tensor(out, dtype=tokens.dtype, device=tokens.device)
+#     return patch_start_ids
 
 
 def find_lookup_table_start_mask(
@@ -483,15 +484,16 @@ class Patcher:
         #     if os.path.exists(maybe_consolidated):
         #         state_path = maybe_consolidated
         #     else:
-        #         state_path = os.path.join(
-        #             patcher_args.entropy_model_checkpoint_dir, "consolidated.pth"
-        #         )
-        entropy_model, _ = load_entropy_model()
-        print(f"Using entropy model {entropy_model} for patching")
+        state_path = os.path.join(
+            patcher_args.entropy_model_checkpoint_dir, f"{patcher_args.dataset_name}.pt"
+        )
+        entropy_model, _ = load_entropy_model(
+                        patcher_args.entropy_model_checkpoint_dir,
+                        state_path,
+                    )
+        # entropy_model, _ = load_entropy_model()
         entropy_model, _ = to_device(entropy_model, patcher_args.patching_device)
         self.entropy_model = entropy_model
-        # else:
-        #     self.entropy_model = None
         self.threshold = patcher_args.threshold
         self.threshold_add = patcher_args.threshold_add
         self.max_patch_length = patcher_args.max_patch_length
@@ -502,7 +504,6 @@ class Patcher:
         self.log_time = patcher_args.log_time
         if self.log_time:
             self.log = defaultdict(float)
-        print(self.threshold, self.threshold_add, self.max_patch_length, self.patch_size, self.patching_batch_size, self.monotonicity)
 
     def patch(
         self,
@@ -551,7 +552,7 @@ class Patcher:
             patch_lengths = torch.ones(
                 (bs, seq_len_next_tok), dtype=tokens.dtype, device=tokens.device
             )
-        # ENTROPY
+        # ENTROPY-BASED DYNAMIC
         elif self.patching_mode == PatchingModeEnum.entropy:
             if self.log_time:
                 s = time.time()
@@ -588,31 +589,31 @@ class Patcher:
             if self.log_time:
                 self.log["patch_lengths_from_start_ids"] += time.time() - s
                 s = time.time()
-        # BPE
-        elif self.patching_mode == PatchingModeEnum.bpe:
-            patch_start_ids = find_bpe_delim_patch_start_ids(tokens, delim=BPE_ID)
-            patch_lengths = patch_lengths_from_start_ids(
-                patch_start_ids, seq_len_next_tok
-            )
-        elif self.patching_mode == PatchingModeEnum.bpe_patcher:
-            patch_start_ids = find_bpe_patcher_patch_start_ids(
-                tokens,
-                self.entropy_model,
-                self.patching_batch_size,
-                self.device,
-                include_next_token,
-            )
-            patch_lengths = patch_lengths_from_start_ids(
-                patch_start_ids, seq_len_next_tok
-            )
-        # SPACE
-        elif self.patching_mode == PatchingModeEnum.space:
-            patch_start_ids = find_space_patch_start_ids(tokens)
-            patch_lengths = patch_lengths_from_start_ids(
-                patch_start_ids, seq_len_next_tok
-            )
-        else:
-            raise NotImplementedError(f"self.patching_mode {self.patching_mode}")
+        # # BPE
+        # elif self.patching_mode == PatchingModeEnum.bpe:
+        #     patch_start_ids = find_bpe_delim_patch_start_ids(tokens, delim=BPE_ID)
+        #     patch_lengths = patch_lengths_from_start_ids(
+        #         patch_start_ids, seq_len_next_tok
+        #     )
+        # elif self.patching_mode == PatchingModeEnum.bpe_patcher:
+        #     patch_start_ids = find_bpe_patcher_patch_start_ids(
+        #         tokens,
+        #         self.entropy_model,
+        #         self.patching_batch_size,
+        #         self.device,
+        #         include_next_token,
+        #     )
+        #     patch_lengths = patch_lengths_from_start_ids(
+        #         patch_start_ids, seq_len_next_tok
+        #     )
+        # # SPACE
+        # elif self.patching_mode == PatchingModeEnum.space:
+        #     patch_start_ids = find_space_patch_start_ids(tokens)
+        #     patch_lengths = patch_lengths_from_start_ids(
+        #         patch_start_ids, seq_len_next_tok
+        #     )
+        # else:
+        #     raise NotImplementedError(f"self.patching_mode {self.patching_mode}")
 
         # Apply any processing to patch lengths
         if self.max_patch_length is not None:

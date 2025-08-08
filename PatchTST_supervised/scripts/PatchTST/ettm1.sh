@@ -44,11 +44,11 @@ do
       --cross_attn_window_encoder 96\
       --cross_attn_window_decoder 96\
       --local_attention_window_len 96\
-      --dropout 0.04\
+      --dropout 0.0\
       --patch_size 8\
       --max_patch_length 8\
       --patching_threshold 0.2\
-      --patching_threshold_add 0.15\
+      --patching_threshold_add 0.1\
       --monotonicity 1\
       --des 'Exp' \
       --train_epochs 100\
@@ -57,7 +57,7 @@ do
       --pct_start 0.4\
       --itr 1 \
       --batch_size 128 \
-      --patching_batch_size 1024 \
+      --patching_batch_size 896 \
       --learning_rate 0.0001 \
       >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
 done

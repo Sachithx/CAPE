@@ -12,10 +12,7 @@ logger = logging.getLogger()
 
 
 def load_entropy_model(
-        entropy_model_checkpoint_dir="/home/AD/sachith/CAPE-TST/PatchTST_supervised/bytelatent/data/pretrained_entropy_model/", 
-        state_dict_path="/home/AD/sachith/CAPE-TST/PatchTST_supervised/bytelatent/data/pretrained_entropy_model/ETTm1.pt", 
-        device="cuda"
-        ):
+        entropy_model_checkpoint_dir, state_dict_path, device="cpu"):
     with open(os.path.join(entropy_model_checkpoint_dir, "params.json")) as fr:
         reloaded = json.loads(fr.read())
     print(reloaded)
@@ -36,7 +33,11 @@ def load_entropy_model(
     )
     entropy_model = GPT(entropy_model_args)
 
-    entropy_model.load_state_dict(torch.load(state_dict_path, map_location=device, weights_only=True)["model_state_dict"], strict=True)
+    entropy_model.load_state_dict(torch.load(
+        state_dict_path, 
+        map_location=device, 
+        weights_only=True
+        )["model_state_dict"], strict=True)
     
     entropy_model.to(device)
     entropy_model = entropy_model.eval()

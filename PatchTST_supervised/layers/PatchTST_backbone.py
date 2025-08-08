@@ -66,7 +66,7 @@ class PatchTST_backbone(nn.Module):
 
         # -----------------------------------------------
         z = z.reshape(bs * nvars, seq_len)
-        z, _, _ = self.tokenizer.context_input_transform(z.cpu())
+        z, _, _ = self.tokenizer.context_input_transform(z)
         z = z.cuda()
         z = self.backbone(z)                                                                    # z: [bs * nvars x patch_num x d_model]
 

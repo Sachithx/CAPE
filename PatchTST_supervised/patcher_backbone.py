@@ -30,7 +30,7 @@ class CAPE_TST_backbone():
             n_heads_local_encoder=configs.n_heads_local_encoder,
             n_heads_local_decoder=configs.n_heads_local_decoder,
 
-            patch_size=configs.patch_size,
+            patch_size=configs.max_patch_length,
             patch_in_forward=True,                # Patch in forward pass
             patching_batch_size=configs.patching_batch_size,
             patching_device="cuda",               # Use CPU for patching in small model
@@ -60,6 +60,7 @@ class CAPE_TST_backbone():
             attn_impl="sdpa",                      # Efficient PyTorch attention
             attn_bias_type="causal",
 
+            multiple_of=configs.multiple_of,                     # Multiple of 128 for efficient attention
             dropout=configs.dropout,                # Lower dropout
             layer_ckpt="none",                     # No checkpointing in small model
             init_use_gaussian=True,
@@ -67,6 +68,8 @@ class CAPE_TST_backbone():
             alpha_depth="disabled",
             log_patch_lengths=True,
 
+            dataset_name=configs.model_id_name,  # Dataset name for patching
+            entropy_model_checkpoint_dir=configs.entropy_model_checkpoint_dir,  # Directory for entropy model checkpoint
             downsampling_by_pooling="max",         # Efficient downsampling
             use_local_encoder_transformer=True,
             share_encoder_decoder_emb=False         # Save memory if possible
