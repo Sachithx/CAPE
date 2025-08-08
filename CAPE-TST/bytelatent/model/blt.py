@@ -937,7 +937,7 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         # ------------------------------------------------
         #                   Patching
         # ------------------------------------------------
-        patch_lengths = torch.ones(bs, 96, dtype=torch.int64, device=tokens.device) * 1
+        # patch_lengths = torch.ones(bs, 96, dtype=torch.int64, device=tokens.device) * 1
         if patch_lengths is None:
             assert (
                 getattr(self, "patcher", None) is not None

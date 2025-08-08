@@ -122,6 +122,8 @@ class Exp_Main(Exp_Basic):
             'PatchTST': PatchTST,
         }
         model = model_dict[self.args.model].Model(self.args).float()
+        # print model architecture
+        print(model)
 
         if self.args.use_multi_gpu and self.args.use_gpu:
             model = nn.DataParallel(model, device_ids=self.args.device_ids)

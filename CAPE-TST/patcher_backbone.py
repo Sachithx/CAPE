@@ -82,6 +82,12 @@ class CAPE_TST_backbone():
             context_length=configs.seq_len,
             prediction_length=configs.seq_len
         )
+
+        print("CAPE-TST Backbone and Tokenizer initialized successfully.")
+        # number of params 
+        print(f"Total parameters in the model: {sum(p.numel() for p in self.backbone.parameters())}")
+        # print model architecture
+        # print(self.backbone)
     
     def place(self):
         return self.backbone, self.tokenizer

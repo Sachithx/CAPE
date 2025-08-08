@@ -216,5 +216,6 @@ PatchTST_supervised/checkpoints/
 PatchTST_supervised/dataset
 CAPE-TST/dataset
 CAPE-TST/checkpoints/
+CAPE-TST/test_results/
 PatchTST_supervised/entropy_model/wandb/
 PatchTST_supervised/entropy_model/dataset/

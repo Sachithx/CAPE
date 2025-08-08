@@ -473,27 +473,24 @@ class Patcher:
         self.patcher_args = patcher_args
         self.patching_mode = patcher_args.patching_mode
         self.realtime_patching = patcher_args.realtime_patching
-        # if self.realtime_patching:
-        #     assert (
-        #         patcher_args.entropy_model_checkpoint_dir is not None
-        #     ), "Cannot require realtime patching without an entropy model checkpoint"
-        #     maybe_consolidated = os.path.join(
-        #         patcher_args.entropy_model_checkpoint_dir,
-        #         "consolidated/consolidated.pth",
-        #     )
-        #     if os.path.exists(maybe_consolidated):
-        #         state_path = maybe_consolidated
-        #     else:
-        state_path = os.path.join(
+        
+        # Store model loading parameters instead of loading immediately
+        self.entropy_model_checkpoint_dir = patcher_args.entropy_model_checkpoint_dir
+        self.dataset_name = patcher_args.dataset_name
+        self.state_path = os.path.join(
             patcher_args.entropy_model_checkpoint_dir, f"{patcher_args.dataset_name}.pt"
         )
-        entropy_model, _ = load_entropy_model(
-                        patcher_args.entropy_model_checkpoint_dir,
-                        state_path,
-                    )
-        # entropy_model, _ = load_entropy_model()
-        entropy_model, _ = to_device(entropy_model, patcher_args.patching_device)
-        self.entropy_model = entropy_model
+        
+        # Cache for device-specific entropy models
+        self._entropy_models = {}
+        
+        # Load the base model once
+        self._base_entropy_model, _ = load_entropy_model(
+            self.entropy_model_checkpoint_dir,
+            self.state_path,
+        )
+        
+        # Other initialization code...
         self.threshold = patcher_args.threshold
         self.threshold_add = patcher_args.threshold_add
         self.max_patch_length = patcher_args.max_patch_length
@@ -504,6 +501,23 @@ class Patcher:
         self.log_time = patcher_args.log_time
         if self.log_time:
             self.log = defaultdict(float)
+
+    def _get_entropy_model_for_device(self, device):
+        device_str = str(device)
+        if device_str not in self._entropy_models:
+            try:
+                import copy
+                entropy_model = copy.deepcopy(self._base_entropy_model)
+                entropy_model = entropy_model.to(device)
+                entropy_model.eval()
+                for param in entropy_model.parameters():
+                    param.requires_grad = False
+                self._entropy_models[device_str] = entropy_model
+            except Exception as e:
+                print(f"Warning: Could not create entropy model for device {device}: {e}")
+                # Fallback to base model
+                return self._base_entropy_model
+        return self._entropy_models[device_str]
 
     def patch(
         self,
@@ -548,10 +562,10 @@ class Patcher:
             ).fill_(self.patch_size)
             if seq_len_next_tok % self.patch_size != 0:
                 patch_lengths[:, -1] = seq_len_next_tok % self.patch_size
-        elif self.patching_mode == PatchingModeEnum.byte:
-            patch_lengths = torch.ones(
-                (bs, seq_len_next_tok), dtype=tokens.dtype, device=tokens.device
-            )
+        # elif self.patching_mode == PatchingModeEnum.byte:
+        #     patch_lengths = torch.ones(
+        #         (bs, seq_len_next_tok), dtype=tokens.dtype, device=tokens.device
+        #     )
         # ENTROPY-BASED DYNAMIC
         elif self.patching_mode == PatchingModeEnum.entropy:
             if self.log_time:
@@ -564,9 +578,9 @@ class Patcher:
                 start_entropies = time.time()
                 scores, _ = calculate_entropies(
                     tokens,
-                    self.entropy_model,
+                    self._get_entropy_model_for_device(tokens.device),  # ← Use device-specific model
                     self.patching_batch_size,
-                    self.device,
+                    tokens.device,  # ← Use tokens.device instead of self.device
                 )
 
             if self.log_time:
