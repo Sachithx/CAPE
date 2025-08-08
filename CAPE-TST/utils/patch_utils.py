@@ -6,7 +6,6 @@ from tqdm import tqdm
 import os
 import argparse
 
-
 from chronos import MeanScaleUniformBins, ChronosConfig
 from pathlib import Path
 
@@ -36,17 +35,18 @@ def build_tokenizer(quant_range, vocab_size, context_length, prediction_length):
 
     tokenizer = MeanScaleUniformBins(low_limit, high_limit, tokenizer_config)
     
-    # Store original method
-    original_input_transform = tokenizer._input_transform
+    # Store original tensors on CPU for multi-GPU compatibility
+    cpu_boundaries = tokenizer.boundaries.cpu()
+    cpu_centers = tokenizer.centers.cpu()
     
     def patched_input_transform(context, scale=None):
         context = context.to(dtype=torch.float32)
         attention_mask = ~torch.isnan(context)
         
-        # Move boundaries to same device as context
-        if tokenizer.boundaries.device != context.device:
-            tokenizer.boundaries = tokenizer.boundaries.to(context.device)
-            tokenizer.centers = tokenizer.centers.to(context.device)
+        # Create device-specific tensors for this call (don't modify original)
+        device = context.device
+        boundaries = cpu_boundaries.to(device)
+        centers = cpu_centers.to(device)
         
         # Continue with original logic
         if scale is None:
@@ -59,7 +59,7 @@ def build_tokenizer(quant_range, vocab_size, context_length, prediction_length):
         token_ids = (
             torch.bucketize(
                 input=scaled_context,
-                boundaries=tokenizer.boundaries,
+                boundaries=boundaries,  # Use local boundaries
                 right=True,
             )
             + tokenizer.config.n_special_tokens
@@ -70,7 +70,20 @@ def build_tokenizer(quant_range, vocab_size, context_length, prediction_length):
 
         return token_ids, attention_mask, scale
     
-    # Replace the method
+    def patched_output_transform(samples, scale):
+        device = samples.device
+        centers = cpu_centers.to(device)
+        
+        scale_unsqueezed = scale.unsqueeze(-1).unsqueeze(-1)
+        indices = torch.clamp(
+            samples - tokenizer.config.n_special_tokens - 1,
+            min=0,
+            max=len(centers) - 1,
+        )
+        return centers[indices] * scale_unsqueezed
+    
+    # Replace the methods
     tokenizer._input_transform = patched_input_transform
+    tokenizer.output_transform = patched_output_transform
     
     return tokenizer
