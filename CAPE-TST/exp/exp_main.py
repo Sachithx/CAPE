@@ -53,6 +53,7 @@ class Exp_Main(Exp_Basic):
                 # 'e_layers': args.e_layers,
                 # 'd_layers': args.d_layers,
                 'dropout': args.dropout,
+                'multiple_of': args.multiple_of if hasattr(args, 'multiple_of') else None,
                 # 'activation': args.activation,
             })
             
