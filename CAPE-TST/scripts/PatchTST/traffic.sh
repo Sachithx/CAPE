@@ -33,27 +33,27 @@ do
       --enc_in 862 \
       --vocab_size 256 \
       --quant_range 4 \
-      --n_layers_local_encoder 3 \
-      --n_layers_local_decoder 3 \
-      --n_layers_global 3 \
-      --dim_global 64 \
-      --dim_local_encoder 32 \
-      --dim_local_decoder 32 \
+      --n_layers_local_encoder 2 \
+      --n_layers_local_decoder 2 \
+      --n_layers_global 2 \
+      --dim_global 32 \
+      --dim_local_encoder 16 \
+      --dim_local_decoder 16 \
       --cross_attn_k 1 \
       --n_heads_local_encoder 4 \
       --n_heads_local_decoder 4 \
       --n_heads_global 8 \
-      --cross_attn_nheads 2 \
-      --cross_attn_window_encoder 96\
-      --cross_attn_window_decoder 96\
-      --local_attention_window_len 96\
-      --dropout 0.1\
+      --cross_attn_nheads 4 \
+      --cross_attn_window_encoder 8\
+      --cross_attn_window_decoder 8\
+      --local_attention_window_len 8\
+      --dropout 0.15\
       --multiple_of 256\
-      --patch_size 6\
-      --max_patch_length 6\
-      --patching_threshold 0.3\
+      --patch_size 8\
+      --max_patch_length 8\
+      --patching_threshold 2.5\
       --patching_threshold_add 0.15\
-      --monotonicity 1\
+      --monotonicity 0\
       --des 'Exp' \
       --train_epochs 100\
       --patience 10\

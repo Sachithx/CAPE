@@ -523,6 +523,9 @@ class Exp_Main(Exp_Basic):
             os.makedirs(folder_path)
 
         mae, mse, rmse, mape, mspe, rse, corr = metric(preds, trues)
+        # Ensure correlation is scalar where needed and also keep the vector
+        corr_vec = np.asarray(corr).reshape(-1)           # (H,) e.g., (96,)
+        corr_mean = float(np.mean(corr_vec))               # scalar for summaries
         print('mse:{}, mae:{}, rse:{}'.format(mse, mae, rse))
         
         # Log test metrics to wandb with PatchTST context
@@ -533,7 +536,7 @@ class Exp_Main(Exp_Basic):
             'test_mape': mape,
             'test_mspe': mspe,
             'test_rse': rse,
-            'test_correlation': corr,
+            'test_correlation_mean': corr_mean,
             'test_samples_count': len(preds),
             'prediction_horizon': self.args.pred_len,
             'input_sequence_length': self.args.seq_len
@@ -550,10 +553,15 @@ class Exp_Main(Exp_Basic):
                 ["MAPE", mape],
                 ["MSPE", mspe],
                 ["RSE", rse],
-                ["Correlation", corr]
+                ["Correlation_mean", corr_mean]
             ]
         )
         wandb.log({"test_metrics_table": metrics_table})
+        # Log per-horizon correlation as its own table (plottable)
+        corr_table = wandb.Table(columns=["Horizon", "Correlation"])
+        for h, v in enumerate(corr_vec, start=1):
+            corr_table.add_data(h, float(v))
+        wandb.log({"correlation_by_horizon": corr_table})
         
         # Create error distribution plot
         errors = preds - trues
