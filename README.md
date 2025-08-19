@@ -1,4 +1,4 @@
-# 🌐 CAPE-TST: Context-Aware Dynamic Patch Encoder for Time Series Transformers
+# 🌐 CAPE: Context-Aware Dynamic Patch Encoder for Time Series Transformers
 
 This repository contains the official implementation of the paper:
 
