@@ -220,6 +220,7 @@ CAPE-TST/test_results/
 PatchTST_supervised/entropy_model/wandb/
 PatchTST_supervised/entropy_model/dataset/
 CAPE-TST/wandb
+
  
-CAPE-TST/results/PatchTST_ETTh2_SL96_PL96_GL1_EL1_DL1_GD16_DD16_ED16_GH2_EH2_DH2/pred.npy
+CAPE-TST/results/
  
