@@ -15,7 +15,11 @@ model_id_name=ETTh2
 data_name=ETTh2
 
 random_seed=2025
+<<<<<<< HEAD
+for pred_len in 96 192 336 720
+=======
 for pred_len in 192 336 720
+>>>>>>> d6826395f7e06f2c73f4ec3d72fe069b40362a66
 do
     python -u run_longExp.py \
       --random_seed $random_seed \
