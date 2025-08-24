@@ -1,6 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[codz]
+*.py[cod]
 *$py.class
 
 # C extensions
@@ -175,12 +175,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Abstra
-# Abstra is an AI-powered process automation framework.
-# Ignore directories containing user credentials, local state, and settings.
-# Learn more at https://abstra.io/docs
-.abstra/
-
 # Visual Studio Code
 #  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
@@ -188,7 +182,7 @@ cython_debug/
 #  you could uncomment the following to ignore the entire vscode folder
 # .vscode/
 
-# Ruff stuff:
+# Ruff
 .ruff_cache/
 
 # PyPI configuration file
@@ -201,26 +195,31 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# macOS
+.DS_Store
+
+# Abstra
+# Abstra is an AI-powered process automation framework.
+# Ignore directories containing user credentials, local state, and settings.
+# Learn more at https://abstra.io/docs
+.abstra/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-.DS_Store
+
+# Project-specific directories
 timeblt2/entropy_model/output/
 timeblt2/entropy_model/wandb/
-
 timeblt2/wandb/
 PatchTST_supervised/wandb/
-CAPE-TST/wandb/
 PatchTST_supervised/checkpoints/
-PatchTST_supervised/dataset
-CAPE-TST/dataset
-CAPE-TST/checkpoints/
-CAPE-TST/test_results/
+PatchTST_supervised/dataset/
 PatchTST_supervised/entropy_model/wandb/
 PatchTST_supervised/entropy_model/dataset/
-CAPE-TST/wandb
- 
-CAPE-TST/results/PatchTST_ETTh2_SL96_PL96_GL1_EL1_DL1_GD16_DD16_ED16_GH2_EH2_DH2/pred.npy
- 
+CAPE-TST/wandb/
+CAPE-TST/dataset/
+CAPE-TST/checkpoints/
+CAPE-TST/test_results/
 CAPE-TST/results/
