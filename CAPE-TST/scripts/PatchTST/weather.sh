@@ -32,13 +32,13 @@ do
       --pred_len $pred_len \
       --enc_in 21 \
       --vocab_size 256 \
-      --quant_range 3 \
+      --quant_range 4 \
       --n_layers_local_encoder 2 \
       --n_layers_local_decoder 2 \
       --n_layers_global 2 \
-      --dim_global 64 \
-      --dim_local_encoder 32 \
-      --dim_local_decoder 32 \
+      --dim_global 32 \
+      --dim_local_encoder 16 \
+      --dim_local_decoder 16 \
       --cross_attn_k 1 \
       --n_heads_local_encoder 4 \
       --n_heads_local_decoder 4 \
@@ -62,6 +62,6 @@ do
       --itr 1 \
       --batch_size 512 \
       --patching_batch_size 10752 \
-      --learning_rate 0.0001 \
+      --learning_rate 0.0005 \
       >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
 done
