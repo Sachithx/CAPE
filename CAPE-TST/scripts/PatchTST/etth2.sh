@@ -15,7 +15,7 @@ model_id_name=ETTh2
 data_name=ETTh2
 
 random_seed=2025
-for pred_len in 96 #192 336 720
+for pred_len in 96 192 336 720
 do
     python -u run_longExp.py \
       --random_seed $random_seed \
@@ -32,13 +32,13 @@ do
       --pred_len $pred_len \
       --enc_in 7 \
       --vocab_size 256 \
-      --quant_range 3 \
+      --quant_range 1 \
       --n_layers_local_encoder 1 \
       --n_layers_local_decoder 1 \
       --n_layers_global 1 \
-      --dim_global 16 \
-      --dim_local_encoder 16 \
-      --dim_local_decoder 16 \
+      --dim_global 8 \
+      --dim_local_encoder 8 \
+      --dim_local_decoder 8 \
       --cross_attn_k 1 \
       --n_heads_local_encoder 2 \
       --n_heads_local_decoder 2 \
@@ -47,8 +47,8 @@ do
       --cross_attn_window_encoder 96\
       --cross_attn_window_decoder 96\
       --local_attention_window_len 96\
-      --dropout 0.1\
-      --multiple_of 256\
+      --dropout 0.2\
+      --multiple_of 128\
       --patch_size 24\
       --max_patch_length 24\
       --patching_threshold 0.3\
