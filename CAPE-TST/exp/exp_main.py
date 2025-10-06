@@ -124,7 +124,7 @@ class Exp_Main(Exp_Basic):
         }
         model = model_dict[self.args.model].Model(self.args).float()
         # print model architecture
-        print(model)
+        # print(model)
 
         if self.args.use_multi_gpu and self.args.use_gpu:
             model = nn.DataParallel(model, device_ids=self.args.device_ids)
@@ -272,6 +272,23 @@ class Exp_Main(Exp_Basic):
                 iter_count += 1
                 model_optim.zero_grad()
                 batch_x = batch_x.float().to(self.device)
+                
+                if i == 0 and epoch == 0:
+                    # Print model FLOPs and parameters count (only once)
+                    try:
+                        from ptflops import get_model_complexity_info    
+                        with torch.cuda.device(0):
+                            macs, params = get_model_complexity_info(self.model.cuda(), (batch_x.shape[1],batch_x.shape[2]), as_strings=True, print_per_layer_stat=False)
+                            print('Input shape:', (batch_x.shape[1],batch_x.shape[2]))
+                            print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
+                            print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+                    except Exception as e:
+                        print(f"Could not calculate FLOPs: {e}")
+                        # Fallback to just parameter count
+                        total_params = sum(p.numel() for p in self.model.parameters())
+                        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+                        print(f"Total Parameters: {total_params:,}")
+                        print(f"Trainable Parameters: {trainable_params:,}")
 
                 batch_y = batch_y.float().to(self.device)
                 batch_x_mark = batch_x_mark.float().to(self.device)
@@ -505,9 +522,6 @@ class Exp_Main(Exp_Basic):
                     # Also save locally
                     visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
 
-        if self.args.test_flop:
-            test_params_flop((batch_x.shape[1],batch_x.shape[2]))
-            exit()
             
         preds = np.array(preds)
         trues = np.array(trues)

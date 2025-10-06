@@ -1,0 +1,100 @@
+_wandb:
+    value:
+        cli_version: 0.21.3
+        code_path: code/CAPE-TST/entropy_model/train_entropy_model.py
+        e:
+            yqwhsqy6ve2zfotzf0vegy8hp6g442xt:
+                codePath: CAPE-TST/entropy_model/train_entropy_model.py
+                codePathLocal: train_entropy_model.py
+                cpu_count: 24
+                cpu_count_logical: 32
+                cudaVersion: "12.9"
+                disk:
+                    /:
+                        total: "1030963863552"
+                        used: "82049851392"
+                email: e240203@e.ntu.edu.sg
+                executable: /home/sachith/miniconda3/envs/cape/bin/python
+                git:
+                    commit: cd86214454fd321568e8054181e9066692e8d527
+                    remote: https://github.com/Sachithx/CAPE.git
+                gpu: NVIDIA GeForce RTX 4090
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 16384
+                      memoryTotal: "24146608128"
+                      name: NVIDIA GeForce RTX 4090
+                      uuid: GPU-e727b98b-fee2-44af-94fb-c828b85f12e1
+                host: sachith-MS-7E06
+                memory:
+                    total: "134905376768"
+                os: Linux-6.14.0-29-generic-x86_64-with-glibc2.39
+                program: /home/sachith/CAPE/CAPE-TST/entropy_model/train_entropy_model.py
+                python: CPython 3.12.11
+                root: /home/sachith/CAPE/CAPE-TST/entropy_model
+                startedAt: "2025-09-10T01:35:59.961648Z"
+                writerId: yqwhsqy6ve2zfotzf0vegy8hp6g442xt
+        m: []
+        python_version: 3.12.11
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 53
+                - 71
+            "2":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 53
+                - 71
+            "3":
+                - 15
+                - 16
+                - 61
+            "4": 3.12.11
+            "5": 0.21.3
+            "6": 4.56.0
+            "12": 0.21.3
+            "13": linux-x86_64
+data:
+    value:
+        batch_size: 512
+        dataset_name: ETTm2
+        features: M
+        quant_range: 4
+        seq_len: 96
+hardware:
+    value:
+        compile: true
+        device: cuda
+        device_type: cuda
+        dtype: bfloat16
+lr_schedule:
+    value:
+        decay_lr: true
+        min_lr_factor: 0.05
+        warmup_steps: 0
+model:
+    value:
+        bias: false
+        block_size: 96
+        dropout: 0.1
+        n_embd: 16
+        n_head: 4
+        n_layer: 2
+        vocab_size: 256
+training:
+    value:
+        beta1: 0.9
+        beta2: 0.95
+        clip_grad: 1
+        epochs: 25
+        grad_accumulation_steps: 1
+        learning_rate: 0.001
+        patience: 10
+        weight_decay: 0.05

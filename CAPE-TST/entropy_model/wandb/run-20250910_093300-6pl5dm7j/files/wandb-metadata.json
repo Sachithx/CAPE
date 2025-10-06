@@ -1,0 +1,40 @@
+{
+  "os": "Linux-6.14.0-29-generic-x86_64-with-glibc2.39",
+  "python": "CPython 3.12.11",
+  "startedAt": "2025-09-10T01:33:00.114273Z",
+  "program": "/home/sachith/CAPE/CAPE-TST/entropy_model/train_entropy_model.py",
+  "codePath": "CAPE-TST/entropy_model/train_entropy_model.py",
+  "codePathLocal": "train_entropy_model.py",
+  "git": {
+    "remote": "https://github.com/Sachithx/CAPE.git",
+    "commit": "cd86214454fd321568e8054181e9066692e8d527"
+  },
+  "email": "e240203@e.ntu.edu.sg",
+  "root": "/home/sachith/CAPE/CAPE-TST/entropy_model",
+  "host": "sachith-MS-7E06",
+  "executable": "/home/sachith/miniconda3/envs/cape/bin/python",
+  "cpu_count": 24,
+  "cpu_count_logical": 32,
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1030963863552",
+      "used": "82013863936"
+    }
+  },
+  "memory": {
+    "total": "134905376768"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4090",
+      "memoryTotal": "24146608128",
+      "cudaCores": 16384,
+      "architecture": "Ada",
+      "uuid": "GPU-e727b98b-fee2-44af-94fb-c828b85f12e1"
+    }
+  ],
+  "cudaVersion": "12.9",
+  "writerId": "z7zib3vq5c3mzawdg7syn8hkgem4aiz7"
+}

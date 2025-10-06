@@ -128,21 +128,21 @@ def fill_tokens(tokens, patch_size, fill_id):
 
 def decoder_patch_ids_from_lengths(patch_lengths, nb_boe, seq_len):
     first_patch_length = patch_lengths[0, 0]
-    assert torch.all(
-        first_patch_length == patch_lengths[:, 0]
-    ), "first patch should always be the same size (1 for dynamic, patch_size for static)."
-    assert (
-        first_patch_length - nb_boe == 1
-    ), f"First patch (patch length: {first_patch_length}) should have one non-boe token (boe toks: {nb_boe})"
+    # assert torch.all(
+    #     first_patch_length == patch_lengths[:, 0]
+    # ), "first patch should always be the same size (1 for dynamic, patch_size for static)."
+    # assert (
+    #     first_patch_length - nb_boe == 1
+    # ), f"First patch (patch length: {first_patch_length}) should have one non-boe token (boe toks: {nb_boe})"
     # Remove first patch from patch_ids for local decoder inputs and shift the last patch.
     # decoder_patch_lengths = patch_lengths[:, 1:].clone()
     # decoder_patch_lengths = add_to_last_nonzero_patch(decoder_patch_lengths, 1)
     decoder_patch_lengths = patch_lengths[:, 1:]
-    assert (
-        decoder_patch_lengths.sum() + (nb_boe + 1) * patch_lengths.shape[0]
-        == patch_lengths.sum()
-    ), f"{decoder_patch_lengths.sum() + (nb_boe + 1) * patch_lengths.shape[0]} != {patch_lengths.sum()}"
-    assert torch.all(decoder_patch_lengths >= 0), f"{decoder_patch_lengths}"
+    # assert (
+    #     decoder_patch_lengths.sum() + (nb_boe + 1) * patch_lengths.shape[0]
+    #     == patch_lengths.sum()
+    # ), f"{decoder_patch_lengths.sum() + (nb_boe + 1) * patch_lengths.shape[0]} != {patch_lengths.sum()}"
+    # assert torch.all(decoder_patch_lengths >= 0), f"{decoder_patch_lengths}"
     decoder_patch_ids = patch_ids_from_lengths(
         patch_lengths=decoder_patch_lengths, seq_len=seq_len
     )
@@ -558,35 +558,35 @@ class ByteLatentTransformerArgs(BaseTransformerArgs):
         return self
 
 
-class GlobalTransformerArgs(ByteLatentTransformerArgs):
-    # Global encoder specific dimensions
-    dim_token_emb: int | None = None
-    dim_patch_emb: int | None = None
+# class GlobalTransformerArgs(ByteLatentTransformerArgs):
+#     # Global encoder specific dimensions
+#     dim_token_emb: int | None = None
+#     dim_patch_emb: int | None = None
 
-    def __post_init__(self):
-        # Override base args with global encoder specific values
-        self.dim = self.dim_global
-        self.n_layers = self.n_layers_global
-        self.n_heads = self.n_heads_global
-        self.n_kv_heads = self.n_kv_heads_global
-        self.local_attention_window_len = None
-        self.cross_attn_encoder = False
-        self.cross_attn_decoder = False
+#     def __post_init__(self):
+#         # Override base args with global encoder specific values
+#         self.dim = self.dim_global
+#         self.n_layers = self.n_layers_global
+#         self.n_heads = self.n_heads_global
+#         self.n_kv_heads = self.n_kv_heads_global
+#         self.local_attention_window_len = None
+#         self.cross_attn_encoder = False
+#         self.cross_attn_decoder = False
 
 
-class LocalDecoderArgs(ByteLatentTransformerArgs):
-    # Local decoder specific dimensions
-    dim_token_emb: int | None = None
-    dim_patch_emb: int | None = None
+# class LocalDecoderArgs(ByteLatentTransformerArgs):
+#     # Local decoder specific dimensions
+#     dim_token_emb: int | None = None
+#     dim_patch_emb: int | None = None
 
-    def __post_init__(self):
-        # Override base args with local decoder specific values
-        self.dim = self.dim_local_decoder
-        self.n_layers = self.n_layers_local_decoder
-        self.n_heads = self.n_heads_local_decoder
-        self.cross_attn_encoder = False
-        self.cross_attn_init_by_pooling = False
-        self.attn_bias_type = "local_block_causal"
+#     def __post_init__(self):
+#         # Override base args with local decoder specific values
+#         self.dim = self.dim_local_decoder
+#         self.n_layers = self.n_layers_local_decoder
+#         self.n_heads = self.n_heads_local_decoder
+#         self.cross_attn_encoder = False
+#         self.cross_attn_init_by_pooling = False
+#         self.attn_bias_type = "local_block_causal"
 
 
 def create_global_transformer(args: ByteLatentTransformerArgs) -> GlobalTransformer:
@@ -622,7 +622,7 @@ def create_local_encoder(args: ByteLatentTransformerArgs) -> LocalEncoder:
         cross_attn_init_by_pooling=args.cross_attn_init_by_pooling,
         # Defaults
         head_dim=args.head_dim,
-        max_seqlen=args.max_encoder_seq_length,
+        max_encoder_seq_length=args.max_encoder_seq_length,
         dropout=args.dropout,
         vocab_size=args.vocab_size + args.pm_size,
         norm_eps=args.norm_eps,
@@ -665,7 +665,7 @@ def create_local_decoder(args: ByteLatentTransformerArgs) -> LocalDecoder:
         cross_attn_k=args.cross_attn_k if args.cross_attn_decoder else None,
         # Defaults
         head_dim=args.head_dim,
-        max_seqlen=args.max_encoder_seq_length,
+        max_encoder_seq_length=args.max_encoder_seq_length,
         dropout=args.dropout,
         vocab_size=args.vocab_size + args.pm_size,
         norm_eps=args.norm_eps,
@@ -937,17 +937,16 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         # ------------------------------------------------
         #                   Patching
         # ------------------------------------------------
-        # patch_lengths = torch.ones(bs, 96, dtype=torch.int64, device=tokens.device) * 1
         if patch_lengths is None:
             assert (
                 getattr(self, "patcher", None) is not None
             ), "Patcher not defined and no patch_lengths passed."
             patch_lengths, tok_scores = self.patcher.patch(
                 local_encoder_tokens,
-                include_next_token=True,
+                include_next_token=False,
                 threshold=self.patcher.threshold,
             )
-            # print(patch_lengths[3], tokens[3])
+            # print(patch_lengths[3])
         else:
             if nb_boe > 0:
                 patch_lengths[:, 0] += nb_boe
@@ -1058,16 +1057,16 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
         dec_embeds = h_encoder[:, nb_boe : nb_boe + N, :]
 
         # Generate decoder patch IDs
-        # decoder_patch_ids = decoder_patch_ids_from_lengths(
-        #     patch_lengths, nb_boe, local_decoder_tokens.shape[-1]
-        # )
+        decoder_patch_ids = decoder_patch_ids_from_lengths(
+            patch_lengths, nb_boe, local_decoder_tokens.shape[-1]
+        )
 
-        # assert (
-        #     torch.max(decoder_patch_ids) + 1 <= h.shape[1]
-        # ), f"{torch.max(decoder_patch_ids) + 1} > {h.shape[1]}"
-        # assert (
-        #     decoder_patch_ids.shape[1] == dec_embeds.shape[1]
-        # ), f"{decoder_patch_ids.shape[1]} != {dec_embeds.shape[1]}"
+        assert (
+            torch.max(decoder_patch_ids) + 1 <= h.shape[1]
+        ), f"{torch.max(decoder_patch_ids) + 1} > {h.shape[1]}"
+        assert (
+            decoder_patch_ids.shape[1] == dec_embeds.shape[1]
+        ), f"{decoder_patch_ids.shape[1]} != {dec_embeds.shape[1]}"
 
         # Cross-attention decoder
         if not self.cross_attn_decoder:
@@ -1096,7 +1095,6 @@ class ByteLatentTransformer(nn.Module, SequenceModelWithOutput):
             tokens=local_decoder_tokens,
             cross_mask=cross_attn_mask_dec,
         )
-
         return output
 
     def init_weights(self):

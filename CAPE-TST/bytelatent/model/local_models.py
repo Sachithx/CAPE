@@ -22,17 +22,11 @@ from bytelatent.model.utils import create_causal_mask, downsample
 from bytelatent.tokenizers.blt_tokenizer import BOE_ID
 
 logger = logging.getLogger()
-try:
-    from apex.normalization.fused_layer_norm import FusedRMSNorm
-
-    RMSNorm = FusedRMSNorm
-except (ImportError, ModuleNotFoundError):
-    logging.debug("Apex not found. Using nn.RMSNorm")
-    RMSNorm = nn.RMSNorm
+RMSNorm = nn.RMSNorm
 
 
 class LocalModelArgs(BaseTransformerArgs):
-    model_config = ConfigDict(extra="forbid")
+    # model_config = ConfigDict(extra="forbid")
     # Override defaults
     attn_impl: str | None = "xformers"
     attn_bias_type: str | None = "local_block_causal"
@@ -43,6 +37,7 @@ class LocalModelArgs(BaseTransformerArgs):
     patch_size: float
     sliding_window: int | None
     use_rope: bool
+    max_encoder_seq_length: int
     cross_attn_encoder: bool | None
     cross_attn_decoder: bool | None
     cross_attn_k: int | None
@@ -73,6 +68,7 @@ class LocalModelBase(nn.Module):
         self.attn_bias_type = args.attn_bias_type
         self.sliding_window = args.sliding_window
         self.use_rope = args.use_rope
+        self.max_encoder_seq_length = args.max_encoder_seq_length
         self.init_std_factor = args.init_std_factor
         self.cross_attn_encoder = getattr(args, "cross_attn_encoder", None)
         self.cross_attn_decoder = getattr(args, "cross_attn_decoder", None)
@@ -85,24 +81,24 @@ class LocalModelBase(nn.Module):
             [TransformerBlock(args) for _ in range(args.n_layers)]
         )
 
-        if not self.use_rope:
-            self.pos_embeddings = nn.Embedding(args.max_length, args.dim)
-        else:
-            self.rope = RotaryEmbedding(
-                theta=args.rope_theta,
-                head_dim=args.head_dim or args.dim // args.n_heads,
-                max_seqlen=args.max_seqlen,
-                rope_use_fp32_in_outer_product=args.rope_use_fp32_in_outer_product,
-            )
-            self.pos_embeddings = None
+        # if not self.use_rope:
+        self.pos_embeddings = nn.Embedding(args.max_encoder_seq_length, args.dim)
+        # else:
+        #     self.rope = RotaryEmbedding(
+        #         theta=args.rope_theta,
+        #         head_dim=args.head_dim or args.dim // args.n_heads,
+        #         max_seqlen=args.max_seqlen,
+        #         rope_use_fp32_in_outer_product=args.rope_use_fp32_in_outer_product,
+        #     )
+        #     self.pos_embeddings = None
 
-        self.token_embedding_projection = (
-            nn.Linear(args.dim_token_emb, args.dim, bias=False)
-            if hasattr(args, "dim_token_emb") and args.dim_token_emb != self.dim
-            else None
-        )
+        # self.token_embedding_projection = (
+        #     nn.Linear(args.dim_token_emb, args.dim, bias=False)
+        #     if hasattr(args, "dim_token_emb") and args.dim_token_emb != self.dim
+        #     else None
+        # )
 
-        self.patch_embedding_projection = self._create_patch_projection(args)
+        self.patch_embedding_projection = None #  self._create_patch_projection(args)
 
     def _should_create_patch_projection(self, args: LocalModelArgs):
         dimension_mismatch = (
@@ -129,10 +125,10 @@ class LocalModelBase(nn.Module):
         )
 
     def apply_embedding(self, tokens, embeds):
-        if embeds is not None:
-            return embeds
-        else:
-            return self.tok_embeddings(tokens)
+        # if embeds is not None:
+        #     return embeds
+        # else:
+        return self.tok_embeddings(tokens)
 
     def init_weights(self, init_std=None):
         self.rope.reset_parameters()
@@ -218,6 +214,7 @@ class LocalEncoder(LocalModelBase):
         self.cross_attn_all_layers_encoder = args.cross_attn_all_layers_encoder
         self.cross_attn_init_by_pooling = args.cross_attn_init_by_pooling
         self.cross_attn_nheads = args.cross_attn_nheads
+        self.max_seqlen = args.max_seqlen
 
         self.tok_embeddings = nn.Embedding(self.vocab_size, args.dim)
 
@@ -236,14 +233,14 @@ class LocalEncoder(LocalModelBase):
                 )
 
     def apply_embedding(self, tokens, embeds):
-        if embeds is not None:
-            assert (
-                self.expects_hash_embeddings
-            ), "Not expecting embeddings to be passed."
+        # if embeds is not None:
+        #     assert (
+        #         self.expects_hash_embeddings
+        #     ), "Not expecting embeddings to be passed."
 
-            return embeds
-        else:
-            return self.tok_embeddings(tokens)
+        #     return embeds
+        # else:
+        return self.tok_embeddings(tokens)
 
     def forward(
         self,
@@ -259,26 +256,30 @@ class LocalEncoder(LocalModelBase):
 
         bs, seqlen = tokens.shape
 
-        if mask is None:
-            mask = create_causal_mask(
-                seqlen,
-                self.attn_impl,
-                self.attn_bias_type,
-                sliding_window=self.sliding_window,
-                tokens=tokens,
-                eos_id=self.eos_id,
-            )
+        # if mask is None:
+        #     mask = create_causal_mask(
+        #         seqlen,
+        #         self.attn_impl,
+        #         self.attn_bias_type,
+        #         sliding_window=self.sliding_window,
+        #         tokens=tokens,
+        #         eos_id=self.eos_id,
+        #     )
 
         # ----------------------------------------------
         #           Token Embedding 
         # ----------------------------------------------
         h = self.apply_embedding(tokens, embeds)
-        freqs_cis = self.rope(seqlen=seqlen) if self.use_rope else None
+        pos_ids = torch.arange(seqlen, device=h.device).unsqueeze(0)
+        pos_emb = self.pos_embeddings(pos_ids)
+        h = h + pos_emb
+
+        # freqs_cis = self.rope(seqlen=seqlen) if self.use_rope else None
 
         h = F.dropout(h, p=self.dropout, training=self.training)
 
         for i, layer in enumerate(self.layers):
-            h = layer(h, mask=mask, freq_cis=freqs_cis, attn_impl=self.attn_impl)
+            h = layer(h, mask=mask, freq_cis=None, attn_impl=self.attn_impl)
             # check if cross attention should be applied to either all layer or only the last layer
             if self.cross_attn_encoder and (
                 i == len(self.layers) - 1 or self.cross_attn_all_layers_encoder
@@ -342,15 +343,6 @@ class LocalDecoder(LocalModelBase):
                         norm_eps=args.norm_eps,
                     )
                 )
-        ## -------LLM Training Logits-------
-        # self.output = nn.Linear(
-        #     self.dim,
-        #     args.vocab_size,
-        #     bias=False,
-        # )
-
-
-        # self.prediction_head = nn.Linear(args.dim * 96, 96)
 
 
     def forward(
@@ -365,32 +357,36 @@ class LocalDecoder(LocalModelBase):
         bs, seqlen = tokens.shape
         assert embeds is not None, "Embeddings must be provided"
 
-        if mask is None:
-            mask = create_causal_mask(
-                seqlen,
-                self.attn_impl,
-                self.attn_bias_type,
-                sliding_window=self.sliding_window,
-                tokens=tokens,
-                eos_id=self.eos_id,
-            )
+        # if mask is None:
+        #     mask = create_causal_mask(
+        #         seqlen,
+        #         self.attn_impl,
+        #         self.attn_bias_type,
+        #         sliding_window=self.sliding_window,
+        #         tokens=tokens,
+        #         eos_id=self.eos_id,
+        #     )
 
         h = embeds
         # print(f"h/emmbd shape: {embeds.shape}")
 
-        if self.patch_embedding_projection is not None:
-            # print(f"Patch embeddings shape before projection: {patch_embeds.shape if patch_embeds is not None else 'None'}")
-            assert patch_embeds is not None, "Patch embeddings must be passed."
-            patch_embeds = self.patch_embedding_projection(patch_embeds)
-            if self.cross_attn_k is not None:
-                patch_embeds = patch_embeds.reshape(
-                    bs, patch_embeds.shape[1] * self.cross_attn_k, self.dim
-                )
+        # if self.patch_embedding_projection is not None:
+        #     # print(f"Patch embeddings shape before projection: {patch_embeds.shape if patch_embeds is not None else 'None'}")
+        #     assert patch_embeds is not None, "Patch embeddings must be passed."
+        #     patch_embeds = self.patch_embedding_projection(patch_embeds)
+        #     if self.cross_attn_k is not None:
+        #         patch_embeds = patch_embeds.reshape(
+        #             bs, patch_embeds.shape[1] * self.cross_attn_k, self.dim
+        #         )
         # print(f"Patch embeddings shape after projection: {patch_embeds.shape}")
         if patch_embeds is not None and not self.cross_attn_decoder:
             h = h + patch_embeds
+        
+        pos_ids = torch.arange(seqlen, device=h.device).unsqueeze(0)
+        pos_emb = self.pos_embeddings(pos_ids)
+        h = h + pos_emb
 
-        freqs_cis = self.rope(seqlen=seqlen) if self.use_rope else None
+        # freqs_cis = self.rope(seqlen=seqlen) if self.use_rope else None
 
         h = F.dropout(h, p=self.dropout, training=self.training)
         for i, layer in enumerate(self.layers):
@@ -405,7 +401,7 @@ class LocalDecoder(LocalModelBase):
                 )
                 h = h + h_cross
 
-            h = layer(h, mask=mask, freq_cis=freqs_cis, attn_impl=self.attn_impl)
+            h = layer(h, mask=mask, freq_cis=None, attn_impl=self.attn_impl)
 
         h_preds = self.norm(h)
         h_preds = F.dropout(h_preds, p=self.dropout, training=self.training)

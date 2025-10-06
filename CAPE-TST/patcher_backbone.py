@@ -55,8 +55,8 @@ class CAPE_TST_backbone():
             encoder_hash_byte_group_nb_functions=2,
             encoder_enable_byte_ngrams=False,
 
-            non_linearity="swiglu",
-            use_rope=True,
+            non_linearity="gelu",
+            use_rope=False,
             attn_impl="sdpa",                      # Efficient PyTorch attention
             attn_bias_type="causal",
 
@@ -72,7 +72,7 @@ class CAPE_TST_backbone():
             entropy_model_checkpoint_dir=configs.entropy_model_checkpoint_dir,  # Directory for entropy model checkpoint
             downsampling_by_pooling="max",         # Efficient downsampling
             use_local_encoder_transformer=True,
-            share_encoder_decoder_emb=False         # Save memory if possible
+            share_encoder_decoder_emb=True         # Save memory if possible
         )
 
         self.backbone = ByteLatentTransformer(model_args)
